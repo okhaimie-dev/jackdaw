@@ -7,11 +7,11 @@ use bevy::{
     ecs::reflect::AppTypeRegistry,
     prelude::*,
     reflect::serde::{TypedReflectDeserializer, TypedReflectSerializer},
-    tasks::IoTaskPool,
+    tasks::{AsyncComputeTaskPool, IoTaskPool, Task, futures_lite::future},
     window::{PrimaryWindow, RawHandleWrapper},
 };
 use jackdaw_jsn::format::{JsnAssets, JsnEntity, JsnHeader, JsnMetadata, JsnScene};
-use rfd::AsyncFileDialog;
+use rfd::{AsyncFileDialog, FileHandle};
 use serde::de::DeserializeSeed;
 
 use crate::EditorEntity;
@@ -49,8 +49,14 @@ pub struct SceneIoPlugin;
 impl Plugin for SceneIoPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SceneFilePath>()
-            .add_systems(Update, handle_scene_io_keys);
+            .add_systems(Update, (handle_scene_io_keys, poll_scene_dialog));
     }
+}
+
+#[derive(Resource)]
+enum SceneDialogTask {
+    Save(Task<Option<FileHandle>>),
+    Load(Task<Option<FileHandle>>),
 }
 
 /// Stores the currently active scene file path and metadata.
@@ -69,7 +75,7 @@ fn get_window_handle(world: &mut World) -> Option<RawHandleWrapper> {
         .cloned()
 }
 
-fn show_save_dialog(world: &mut World) -> Option<PathBuf> {
+fn spawn_save_dialog(world: &mut World) {
     let raw_handle = get_window_handle(world);
     let last_dir = world.resource::<SceneFilePath>().last_directory.clone();
 
@@ -86,10 +92,11 @@ fn show_save_dialog(world: &mut World) -> Option<PathBuf> {
         dialog = dialog.set_parent(&handle);
     }
 
-    bevy::tasks::block_on(dialog.save_file()).map(|fh| fh.path().to_path_buf())
+    let task = AsyncComputeTaskPool::get().spawn(async move { dialog.save_file().await });
+    world.insert_resource(SceneDialogTask::Save(task));
 }
 
-fn show_open_dialog(world: &mut World) -> Option<PathBuf> {
+fn spawn_open_dialog(world: &mut World) {
     let raw_handle = get_window_handle(world);
     let last_dir = world.resource::<SceneFilePath>().last_directory.clone();
 
@@ -106,7 +113,8 @@ fn show_open_dialog(world: &mut World) -> Option<PathBuf> {
         dialog = dialog.set_parent(&handle);
     }
 
-    bevy::tasks::block_on(dialog.pick_file()).map(|fh| fh.path().to_path_buf())
+    let task = AsyncComputeTaskPool::get().spawn(async move { dialog.pick_file().await });
+    world.insert_resource(SceneDialogTask::Load(task));
 }
 
 pub fn save_scene(world: &mut World) {
@@ -121,18 +129,10 @@ pub fn save_scene(world: &mut World) {
 }
 
 pub fn save_scene_as(world: &mut World) {
-    let Some(chosen) = show_save_dialog(world) else {
-        return;
-    };
-
-    let path_str = chosen.to_string_lossy().to_string();
-    let last_dir = chosen.parent().map(|p| p.to_path_buf());
-
-    let mut scene_path = world.resource_mut::<SceneFilePath>();
-    scene_path.path = Some(path_str);
-    scene_path.last_directory = last_dir;
-
-    save_scene_inner(world);
+    if world.contains_resource::<SceneDialogTask>() {
+        return; // Dialog already open
+    }
+    spawn_save_dialog(world);
 }
 
 fn save_scene_inner(world: &mut World) {
@@ -194,10 +194,13 @@ fn save_scene_inner(world: &mut World) {
 }
 
 pub fn load_scene(world: &mut World) {
-    let Some(chosen) = show_open_dialog(world) else {
-        return;
-    };
+    if world.contains_resource::<SceneDialogTask>() {
+        return; // Dialog already open
+    }
+    spawn_open_dialog(world);
+}
 
+fn finish_load_scene(world: &mut World, chosen: &std::path::Path) {
     let path = chosen.to_string_lossy().to_string();
     let last_dir = chosen.parent().map(|p| p.to_path_buf());
 
@@ -583,6 +586,41 @@ fn days_to_date(days: u64) -> (u64, u64, u64) {
 
 fn is_leap(y: u64) -> bool {
     (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+}
+
+fn poll_scene_dialog(world: &mut World) {
+    let Some(mut task) = world.remove_resource::<SceneDialogTask>() else {
+        return;
+    };
+
+    match &mut task {
+        SceneDialogTask::Save(t) => {
+            let Some(result) = future::block_on(future::poll_once(t)) else {
+                world.insert_resource(task); // Not ready, put it back
+                return;
+            };
+            if let Some(file) = result {
+                let path = file.path().to_path_buf();
+                let path_str = path.to_string_lossy().to_string();
+                let last_dir = path.parent().map(|p| p.to_path_buf());
+
+                let mut scene_path = world.resource_mut::<SceneFilePath>();
+                scene_path.path = Some(path_str);
+                scene_path.last_directory = last_dir;
+
+                save_scene_inner(world);
+            }
+        }
+        SceneDialogTask::Load(t) => {
+            let Some(result) = future::block_on(future::poll_once(t)) else {
+                world.insert_resource(task);
+                return;
+            };
+            if let Some(file) = result {
+                finish_load_scene(world, file.path());
+            }
+        }
+    }
 }
 
 fn handle_scene_io_keys(world: &mut World) {
