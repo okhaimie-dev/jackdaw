@@ -1,8 +1,15 @@
 use std::path::PathBuf;
 
-use bevy::{feathers::theme::ThemedText, prelude::*};
-use jackdaw_feathers::{file_browser, icons::IconFont, tokens};
+use bevy::{
+    feathers::theme::ThemedText,
+    prelude::*,
+    tasks::{AsyncComputeTaskPool, Task, futures_lite::future},
+    ui_widgets::observe,
+    window::{PrimaryWindow, RawHandleWrapper},
+};
+use jackdaw_feathers::{file_browser, icons, icons::IconFont, tokens};
 use jackdaw_widgets::file_browser::{FileBrowserItem, FileItemDoubleClicked};
+use rfd::AsyncFileDialog;
 
 use crate::{
     EditorEntity,
@@ -15,8 +22,12 @@ pub struct AssetBrowserPlugin;
 impl Plugin for AssetBrowserPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AssetBrowserState>()
-            .add_systems(Startup, setup_initial_directory)
-            .add_systems(Update, refresh_browser_on_change)
+            .add_systems(OnEnter(crate::AppState::Editor), setup_initial_directory)
+            .add_systems(
+                Update,
+                (refresh_browser_on_change, poll_asset_browser_folder)
+                    .run_if(in_state(crate::AppState::Editor)),
+            )
             .add_observer(handle_file_double_click);
     }
 }
@@ -71,12 +82,29 @@ pub struct AssetBrowserContent;
 #[derive(Component)]
 pub struct AssetBrowserBreadcrumb;
 
-fn setup_initial_directory(mut state: ResMut<AssetBrowserState>) {
-    // Set the assets directory as the root to match Bevy's asset loading paths.
-    let assets_dir = state.root_directory.join("assets");
-    if assets_dir.is_dir() {
-        state.current_directory = assets_dir.clone();
-        state.root_directory = assets_dir;
+/// Marker for the root directory label text.
+#[derive(Component)]
+struct AssetBrowserRootLabel;
+
+/// Resource holding the async folder picker task for the asset browser.
+#[derive(Resource)]
+struct AssetBrowserFolderTask(Task<Option<rfd::FileHandle>>);
+
+fn setup_initial_directory(
+    mut state: ResMut<AssetBrowserState>,
+    project_root: Option<Res<crate::project::ProjectRoot>>,
+) {
+    // Use ProjectRoot if available, otherwise fall back to CWD.
+    if let Some(project) = project_root {
+        let assets_dir = project.assets_dir();
+        state.root_directory = assets_dir.clone();
+        state.current_directory = assets_dir;
+    } else {
+        let assets_dir = state.root_directory.join("assets");
+        if assets_dir.is_dir() {
+            state.current_directory = assets_dir.clone();
+            state.root_directory = assets_dir;
+        }
     }
     state.needs_refresh = true;
 }
@@ -87,6 +115,7 @@ fn refresh_browser_on_change(
     icon_font: Res<IconFont>,
     content_query: Query<(Entity, Option<&Children>), With<AssetBrowserContent>>,
     breadcrumb_query: Query<(Entity, Option<&Children>), With<AssetBrowserBreadcrumb>>,
+    mut root_label_query: Query<&mut Text, With<AssetBrowserRootLabel>>,
 ) {
     if !state.needs_refresh {
         return;
@@ -221,6 +250,11 @@ fn refresh_browser_on_change(
         ThemedText,
         ChildOf(breadcrumb_entity),
     ));
+
+    // Update root label
+    for mut text in root_label_query.iter_mut() {
+        **text = state.root_directory.to_string_lossy().to_string();
+    }
 }
 
 fn handle_file_double_click(
@@ -249,6 +283,44 @@ fn handle_file_double_click(
     }
 }
 
+fn spawn_asset_folder_dialog(
+    _: On<Pointer<Click>>,
+    mut commands: Commands,
+    raw_handle: Query<&RawHandleWrapper, With<PrimaryWindow>>,
+) {
+    let mut dialog = AsyncFileDialog::new().set_title("Select assets directory");
+    if let Ok(rh) = raw_handle.single() {
+        let handle = unsafe { rh.get_handle() };
+        dialog = dialog.set_parent(&handle);
+    }
+    let task = AsyncComputeTaskPool::get().spawn(async move { dialog.pick_folder().await });
+    commands.insert_resource(AssetBrowserFolderTask(task));
+}
+
+fn poll_asset_browser_folder(world: &mut World) {
+    let Some(mut task_res) = world.get_resource_mut::<AssetBrowserFolderTask>() else {
+        return;
+    };
+    let Some(result) = future::block_on(future::poll_once(&mut task_res.0)) else {
+        return;
+    };
+    world.remove_resource::<AssetBrowserFolderTask>();
+
+    if let Some(handle) = result {
+        let path = handle.path().to_path_buf();
+        let mut state = world.resource_mut::<AssetBrowserState>();
+        state.root_directory = path.clone();
+        state.current_directory = path.clone();
+        state.needs_refresh = true;
+
+        // Update the root label text
+        let mut label_query = world.query_filtered::<&mut Text, With<AssetBrowserRootLabel>>();
+        for mut text in label_query.iter_mut(world) {
+            **text = path.to_string_lossy().to_string();
+        }
+    }
+}
+
 fn is_image_file(path: &str) -> bool {
     let path_lower = path.to_lowercase();
     path_lower.ends_with(".png")
@@ -259,7 +331,8 @@ fn is_image_file(path: &str) -> bool {
         || path_lower.ends_with(".webp")
 }
 
-pub fn asset_browser_panel() -> impl Bundle {
+pub fn asset_browser_panel(icon_font: Handle<Font>) -> impl Bundle {
+    let folder_icon_font = icon_font;
     (
         AssetBrowserPanel,
         EditorEntity,
@@ -272,6 +345,54 @@ pub fn asset_browser_panel() -> impl Bundle {
         },
         BackgroundColor(tokens::PANEL_BG),
         children![
+            // Root directory header
+            (
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceBetween,
+                    width: Val::Percent(100.0),
+                    height: Val::Px(tokens::ROW_HEIGHT),
+                    padding: UiRect::horizontal(Val::Px(tokens::SPACING_MD)),
+                    flex_shrink: 0.0,
+                    ..Default::default()
+                },
+                BackgroundColor(tokens::PANEL_HEADER_BG),
+                children![
+                    // Left side: title + path
+                    (
+                        Node {
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Center,
+                            column_gap: Val::Px(tokens::SPACING_MD),
+                            overflow: Overflow::clip(),
+                            flex_shrink: 1.0,
+                            ..Default::default()
+                        },
+                        children![
+                            (
+                                Text::new("Assets"),
+                                TextFont {
+                                    font_size: tokens::FONT_MD,
+                                    ..Default::default()
+                                },
+                                ThemedText,
+                            ),
+                            (
+                                AssetBrowserRootLabel,
+                                Text::new(""),
+                                TextFont {
+                                    font_size: tokens::FONT_SM,
+                                    ..Default::default()
+                                },
+                                TextColor(tokens::TEXT_SECONDARY),
+                            ),
+                        ],
+                    ),
+                    // Right side: folder picker button
+                    asset_folder_button(folder_icon_font),
+                ],
+            ),
             // Breadcrumb bar
             (
                 AssetBrowserBreadcrumb,
@@ -306,5 +427,22 @@ pub fn asset_browser_panel() -> impl Bundle {
                 },
             )
         ],
+    )
+}
+
+fn asset_folder_button(icon_font: Handle<Font>) -> impl Bundle {
+    (
+        Node {
+            padding: UiRect::all(Val::Px(tokens::SPACING_XS)),
+            border_radius: BorderRadius::all(Val::Px(tokens::BORDER_RADIUS_SM)),
+            ..Default::default()
+        },
+        icons::icon_colored(
+            icons::Icon::FolderOpen,
+            tokens::FONT_MD,
+            icon_font,
+            tokens::TEXT_SECONDARY,
+        ),
+        observe(spawn_asset_folder_dialog),
     )
 }

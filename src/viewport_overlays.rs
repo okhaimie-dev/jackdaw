@@ -16,7 +16,8 @@ impl Plugin for ViewportOverlaysPlugin {
                 PostUpdate,
                 draw_selection_bounding_boxes
                     .after(bevy::camera::visibility::VisibilitySystems::CalculateBounds)
-                    .after(bevy::transform::TransformSystems::Propagate),
+                    .after(bevy::transform::TransformSystems::Propagate)
+                    .run_if(in_state(crate::AppState::Editor)),
             )
             .add_systems(
                 PostUpdate,
@@ -25,11 +26,13 @@ impl Plugin for ViewportOverlaysPlugin {
                     draw_spot_light_gizmo,
                     draw_dir_light_gizmo,
                     draw_camera_gizmo,
-                ),
+                )
+                    .run_if(in_state(crate::AppState::Editor)),
             )
             .add_systems(
                 Update,
-                (draw_coordinate_indicator, draw_navmesh_region_bounds),
+                (draw_coordinate_indicator, draw_navmesh_region_bounds)
+                    .run_if(in_state(crate::AppState::Editor)),
             );
     }
 }
@@ -49,6 +52,7 @@ pub struct OverlaySettings {
     pub show_coordinate_indicator: bool,
     pub bounding_box_mode: BoundingBoxMode,
     pub show_face_grid: bool,
+    pub show_brush_wireframe: bool,
     pub show_alignment_guides: bool,
 }
 
@@ -59,6 +63,7 @@ impl Default for OverlaySettings {
             show_coordinate_indicator: true,
             bounding_box_mode: BoundingBoxMode::default(),
             show_face_grid: true,
+            show_brush_wireframe: true,
             show_alignment_guides: true,
         }
     }

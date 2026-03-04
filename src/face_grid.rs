@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+
+use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 
 use crate::brush::{Brush, BrushMeshCache};
@@ -11,26 +14,65 @@ impl Plugin for FaceGridPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            draw_face_grids.after(bevy::transform::TransformSystems::Propagate),
+            (draw_brush_edges, draw_face_grids)
+                .after(bevy::transform::TransformSystems::Propagate)
+                .run_if(in_state(crate::AppState::Editor)),
         );
     }
 }
 
-/// Draw grid lines on each face of selected brushes.
+/// Draw wireframe edges on all brushes (bright cyan on selected, subtle grey on unselected).
+fn draw_brush_edges(
+    mut gizmos: Gizmos,
+    settings: Res<OverlaySettings>,
+    brushes: Query<(&BrushMeshCache, &GlobalTransform, Has<Selected>)>,
+) {
+    if !settings.show_brush_wireframe {
+        return;
+    }
+
+    for (cache, global_tf, is_selected) in &brushes {
+        let color: Color = if is_selected {
+            tailwind::CYAN_400.into()
+        } else {
+            Color::from(tailwind::GRAY_500).with_alpha(0.5)
+        };
+
+        let mut drawn_edges = HashSet::new();
+        for polygon in &cache.face_polygons {
+            for i in 0..polygon.len() {
+                let a = polygon[i];
+                let b = polygon[(i + 1) % polygon.len()];
+                let edge = (a.min(b), a.max(b));
+                if drawn_edges.insert(edge) {
+                    let wa = global_tf.transform_point(cache.vertices[a]);
+                    let wb = global_tf.transform_point(cache.vertices[b]);
+                    gizmos.line(wa, wb, color);
+                }
+            }
+        }
+    }
+}
+
+/// Draw grid lines on each face of all brushes (brighter on selected).
 fn draw_face_grids(
     mut gizmos: Gizmos,
     settings: Res<OverlaySettings>,
     snap: Res<SnapSettings>,
-    selected: Query<(&Brush, &BrushMeshCache, &GlobalTransform), With<Selected>>,
+    brushes: Query<(&Brush, &BrushMeshCache, &GlobalTransform, Has<Selected>)>,
 ) {
     if !settings.show_face_grid {
         return;
     }
 
     let grid_size = snap.grid_size();
-    let color = Color::srgba(0.5, 0.5, 0.5, 0.2);
 
-    for (brush, cache, global_tf) in &selected {
+    for (brush, cache, global_tf, is_selected) in &brushes {
+        let color = if is_selected {
+            Color::from(tailwind::GRAY_400).with_alpha(0.3)
+        } else {
+            Color::from(tailwind::GRAY_500).with_alpha(0.12)
+        };
         for (face_idx, face_data) in brush.faces.iter().enumerate() {
             let Some(polygon_indices) = cache.face_polygons.get(face_idx) else {
                 continue;

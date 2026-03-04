@@ -24,8 +24,15 @@ impl Plugin for ViewportPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((JackdawCameraPlugin, InfiniteGridPlugin))
             .init_resource::<CameraBookmarks>()
-            .add_systems(Startup, setup_viewport.after(crate::spawn_layout))
-            .add_systems(Update, (update_camera_enabled, handle_camera_keys));
+            .add_systems(
+                OnEnter(crate::AppState::Editor),
+                setup_viewport.after(crate::spawn_layout),
+            )
+            .add_systems(
+                Update,
+                (update_camera_enabled, handle_camera_keys)
+                    .run_if(in_state(crate::AppState::Editor)),
+            );
     }
 }
 

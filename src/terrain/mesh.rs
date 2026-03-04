@@ -7,7 +7,9 @@ use crate::EditorHidden;
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
         Update,
-        (initialize_terrain_chunks, rebuild_dirty_chunks).chain(),
+        (initialize_terrain_chunks, rebuild_dirty_chunks)
+            .chain()
+            .run_if(in_state(crate::AppState::Editor)),
     );
 }
 

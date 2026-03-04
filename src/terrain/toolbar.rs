@@ -10,7 +10,8 @@ use crate::{EditorEntity, selection::Selection};
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
         Update,
-        (toggle_toolbar_visibility, update_terrain_tool_highlights),
+        (toggle_toolbar_visibility, update_terrain_tool_highlights)
+            .run_if(in_state(crate::AppState::Editor)),
     );
 }
 

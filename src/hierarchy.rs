@@ -51,8 +51,10 @@ impl Plugin for HierarchyPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ContextMenuState>()
             .init_resource::<PendingTemplateDefaultName>()
-            .add_systems(Startup, setup_name_watcher)
-            .add_systems(PostStartup, rebuild_hierarchy)
+            .add_systems(
+                OnEnter(crate::AppState::Editor),
+                (setup_name_watcher, rebuild_hierarchy.after(crate::spawn_layout)),
+            )
             .add_systems(
                 Update,
                 (
@@ -62,7 +64,8 @@ impl Plugin for HierarchyPlugin {
                     handle_hierarchy_right_click.after(ContextMenuCloseSet),
                     populate_template_dialog,
                     jackdaw_feathers::tree_view::tree_keyboard_navigation,
-                ),
+                )
+                    .run_if(in_state(crate::AppState::Editor)),
             )
             .add_observer(handle_inline_rename_commit)
             .add_observer(on_root_entity_added)

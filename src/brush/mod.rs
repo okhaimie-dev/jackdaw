@@ -130,7 +130,7 @@ impl Plugin for BrushPlugin {
             .init_resource::<EdgeDragState>()
             .init_resource::<ClipState>()
             .init_resource::<LastUsedTexture>()
-            .add_systems(Startup, mesh::setup_default_materials)
+            .add_systems(OnEnter(crate::AppState::Editor), mesh::setup_default_materials)
             .add_systems(
                 Update,
                 (
@@ -145,7 +145,8 @@ impl Plugin for BrushPlugin {
                     interaction::handle_clip_mode,
                     gizmo_overlay::draw_brush_edit_gizmos,
                 )
-                    .chain(),
+                    .chain()
+                    .run_if(in_state(crate::AppState::Editor)),
             );
     }
 }

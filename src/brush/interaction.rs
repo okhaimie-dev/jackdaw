@@ -453,14 +453,14 @@ pub(super) fn brush_face_interact(
         } else {
             brush_selection.faces = vec![face_idx];
             // Determine extrude mode:
-            // - From object mode: Shift+click = Extend, Ctrl+Shift+click = Merge
+            // - From object mode: Shift+click = Merge, Ctrl+Shift+click = Extend
             // - In face mode: plain drag = Merge, Shift+drag = Extend
             if !in_face_edit {
                 // Entering from object mode via Shift+click
                 drag_state.extrude_mode = if ctrl && shift {
-                    FaceExtrudeMode::Merge
-                } else {
                     FaceExtrudeMode::Extend
+                } else {
+                    FaceExtrudeMode::Merge
                 };
             } else {
                 // Already in face mode

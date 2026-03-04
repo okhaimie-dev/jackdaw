@@ -14,7 +14,7 @@ pub use types::{
 // Re-export geometry crate
 pub use jackdaw_geometry;
 
-pub use format::JsnScene;
+pub use format::{JsnProject, JsnProjectConfig, JsnScene};
 pub use loader::JsnAssetLoader;
 
 pub struct JsnPlugin;

@@ -5,7 +5,10 @@ pub struct ViewModesPlugin;
 impl Plugin for ViewModesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ViewModeSettings>()
-            .add_systems(Update, toggle_wireframe_key);
+            .add_systems(
+                Update,
+                toggle_wireframe_key.run_if(in_state(crate::AppState::Editor)),
+            );
     }
 }
 

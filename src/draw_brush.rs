@@ -8,7 +8,7 @@ use bevy::{
 use crate::{
     EditorEntity,
     brush::BrushFaceEntity,
-    commands::{CommandHistory, EditorCommand, snapshot_entity, snapshot_rebuild},
+    commands::{CommandGroup, CommandHistory, DespawnEntity, EditorCommand, snapshot_entity, snapshot_rebuild},
     selection::{Selected, Selection},
     snapping::SnapSettings,
     viewport::SceneViewport,
@@ -112,8 +112,10 @@ impl Plugin for DrawBrushPlugin {
                 draw_brush_confirm,
                 draw_brush_cancel,
                 draw_brush_preview,
+                join_selected_brushes,
             )
-                .chain(),
+                .chain()
+                .run_if(in_state(crate::AppState::Editor)),
         );
     }
 }
@@ -152,9 +154,14 @@ fn draw_brush_activate(
         return;
     }
 
-    // Check if a brush is selected — if so and mode is Add, use append mode
+    // Only append to selected brush when Alt is held; otherwise always create new
     let append_target = if mode == DrawMode::Add {
-        selection.primary().filter(|&e| brush_query.contains(e))
+        let alt = keyboard.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
+        if alt {
+            selection.primary().filter(|&e| brush_query.contains(e))
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -550,6 +557,20 @@ fn draw_brush_preview(
         DrawMode::Add => DRAW_COLOR,
         DrawMode::Cut => CUT_COLOR,
     };
+
+    // Highlight the append target brush so the user knows they're in hull mode
+    if let Some(target) = active.append_target {
+        if let Ok((brush, brush_tf)) = brushes.get(target) {
+            let (verts, polys) = compute_brush_geometry(&brush.faces);
+            for polygon in &polys {
+                for i in 0..polygon.len() {
+                    let a = brush_tf.transform_point(verts[polygon[i]]);
+                    let b = brush_tf.transform_point(verts[polygon[(i + 1) % polygon.len()]]);
+                    gizmos.line(a, b, DRAW_COLOR);
+                }
+            }
+        }
+    }
 
     match active.phase {
         DrawPhase::PlacingFirstCorner => {
@@ -1480,4 +1501,214 @@ impl EditorCommand for SubtractBrushCommand {
     fn description(&self) -> &str {
         "Subtract brush"
     }
+}
+
+fn join_selected_brushes(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    input_focus: Res<InputFocus>,
+    modal: Res<crate::modal_transform::ModalTransformState>,
+    draw_state: Res<DrawBrushState>,
+    selection: Res<Selection>,
+    brush_query: Query<(&Brush, &GlobalTransform)>,
+    mut commands: Commands,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyJ) {
+        return;
+    }
+    if input_focus.0.is_some() || modal.active.is_some() || draw_state.active.is_some() {
+        return;
+    }
+
+    // Collect selected brush entities (need at least 2)
+    let selected_brushes: Vec<Entity> = selection
+        .entities
+        .iter()
+        .copied()
+        .filter(|&e| brush_query.contains(e))
+        .collect();
+    if selected_brushes.len() < 2 {
+        return;
+    }
+
+    let primary_entity = selected_brushes[0];
+    let others: Vec<Entity> = selected_brushes[1..].to_vec();
+
+    commands.queue(move |world: &mut World| {
+        use avian3d::parry::math::Point as ParryPoint;
+        use avian3d::parry::transformation::convex_hull;
+
+        // Read primary brush data
+        let Some(primary_brush) = world.get::<Brush>(primary_entity) else {
+            return;
+        };
+        let old_primary_brush = primary_brush.clone();
+
+        let Some(primary_gtf) = world.get::<GlobalTransform>(primary_entity) else {
+            return;
+        };
+        let (_, rotation, translation) = primary_gtf.to_scale_rotation_translation();
+        let inv_rotation = rotation.inverse();
+
+        // Gather all vertices in primary's local space
+        let existing_verts = compute_brush_geometry(&old_primary_brush.faces).0;
+        let existing_count = existing_verts.len();
+        let mut all_local_verts: Vec<Vec3> = existing_verts;
+
+        // Gather vertices from other brushes, converted to primary's local space
+        for &other in &others {
+            let Some(other_brush) = world.get::<Brush>(other) else {
+                continue;
+            };
+            let Some(other_gtf) = world.get::<GlobalTransform>(other) else {
+                continue;
+            };
+            let (other_verts, _) = compute_brush_geometry(&other_brush.faces);
+            for v in &other_verts {
+                let world_pos = other_gtf.transform_point(*v);
+                all_local_verts.push(inv_rotation * (world_pos - translation));
+            }
+        }
+
+        if all_local_verts.len() < 4 {
+            return;
+        }
+
+        // Compute convex hull
+        let points: Vec<ParryPoint<f32>> = all_local_verts
+            .iter()
+            .map(|v| ParryPoint::new(v.x, v.y, v.z))
+            .collect();
+        let (hull_verts, hull_tris) = convex_hull(&points);
+        if hull_verts.len() < 4 || hull_tris.is_empty() {
+            return;
+        }
+
+        let hull_positions: Vec<Vec3> = hull_verts
+            .iter()
+            .map(|p| Vec3::new(p.x, p.y, p.z))
+            .collect();
+        let hull_faces = crate::brush::merge_hull_triangles(&hull_positions, &hull_tris);
+        if hull_faces.len() < 4 {
+            return;
+        }
+
+        // Build new face data, matching old primary faces where possible
+        let old_face_polygons = compute_brush_geometry(&old_primary_brush.faces).1;
+        let last_tex = world
+            .resource::<crate::brush::LastUsedTexture>()
+            .texture_path
+            .clone();
+
+        let hull_to_input: Vec<usize> = hull_positions
+            .iter()
+            .map(|hp| {
+                all_local_verts
+                    .iter()
+                    .enumerate()
+                    .min_by(|(_, a), (_, b)| {
+                        (**a - *hp)
+                            .length_squared()
+                            .partial_cmp(&(**b - *hp).length_squared())
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .map(|(i, _)| i)
+                    .unwrap_or(0)
+            })
+            .collect();
+
+        let mut new_faces = Vec::with_capacity(hull_faces.len());
+        for hull_face in &hull_faces {
+            let input_verts: Vec<usize> = hull_face
+                .vertex_indices
+                .iter()
+                .map(|&hi| hull_to_input[hi])
+                .collect();
+            let has_original = input_verts.iter().any(|&i| i < existing_count);
+
+            let mut best_old = None;
+            let mut best_score = -1.0_f32;
+
+            if has_original {
+                for (old_idx, old_polygon) in old_face_polygons.iter().enumerate() {
+                    let old_set: std::collections::HashSet<usize> =
+                        old_polygon.iter().copied().collect();
+                    let overlap = input_verts
+                        .iter()
+                        .filter(|&&i| i < existing_count && old_set.contains(&i))
+                        .count() as f32;
+                    let normal_sim =
+                        hull_face.normal.dot(old_primary_brush.faces[old_idx].plane.normal);
+                    let score = overlap + normal_sim * 0.1;
+                    if score > best_score {
+                        best_score = score;
+                        best_old = Some(old_idx);
+                    }
+                }
+            }
+
+            let face_data = if let Some(old_idx) = best_old {
+                let old_face = &old_primary_brush.faces[old_idx];
+                BrushFaceData {
+                    plane: BrushPlane {
+                        normal: hull_face.normal,
+                        distance: hull_face.distance,
+                    },
+                    material_index: old_face.material_index,
+                    texture_path: old_face.texture_path.clone(),
+                    uv_offset: old_face.uv_offset,
+                    uv_scale: old_face.uv_scale,
+                    uv_rotation: old_face.uv_rotation,
+                }
+            } else {
+                BrushFaceData {
+                    plane: BrushPlane {
+                        normal: hull_face.normal,
+                        distance: hull_face.distance,
+                    },
+                    texture_path: last_tex.clone(),
+                    uv_scale: Vec2::ONE,
+                    ..default()
+                }
+            };
+            new_faces.push(face_data);
+        }
+
+        let new_brush = Brush { faces: new_faces };
+
+        // Snapshot others before despawning (for undo)
+        let mut undo_commands: Vec<Box<dyn EditorCommand>> = Vec::new();
+
+        // SetBrush for primary
+        undo_commands.push(Box::new(crate::brush::SetBrush {
+            entity: primary_entity,
+            old: old_primary_brush,
+            new: new_brush.clone(),
+            label: "Join brushes".to_string(),
+        }));
+
+        // Snapshot and despawn each other brush
+        for &other in &others {
+            undo_commands.push(Box::new(DespawnEntity::from_world(world, other)));
+        }
+
+        // Apply: update primary brush
+        if let Some(mut brush) = world.get_mut::<Brush>(primary_entity) {
+            *brush = new_brush;
+        }
+
+        // Despawn others
+        for &other in &others {
+            if let Ok(entity_mut) = world.get_entity_mut(other) {
+                entity_mut.despawn();
+            }
+        }
+
+        // Push grouped undo command
+        let mut history = world.resource_mut::<CommandHistory>();
+        history.undo_stack.push(Box::new(CommandGroup {
+            commands: undo_commands,
+            label: "Join brushes".to_string(),
+        }));
+        history.redo_stack.clear();
+    });
 }

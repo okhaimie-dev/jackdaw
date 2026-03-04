@@ -11,7 +11,12 @@ impl Plugin for SnappingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SnapSettings>()
             .init_resource::<GridSettings>()
-            .add_systems(Update, (handle_grid_size_keys, sync_grid_settings).chain());
+            .add_systems(
+                Update,
+                (handle_grid_size_keys, sync_grid_settings)
+                    .chain()
+                    .run_if(in_state(crate::AppState::Editor)),
+            );
     }
 }
 

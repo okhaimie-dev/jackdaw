@@ -27,7 +27,8 @@ impl Plugin for ViewportSelectPlugin {
                     handle_viewport_click,
                     handle_box_select,
                     handle_viewport_right_click.after(ContextMenuCloseSet),
-                ),
+                )
+                    .run_if(in_state(crate::AppState::Editor)),
             )
             .add_observer(on_viewport_context_menu_action);
     }

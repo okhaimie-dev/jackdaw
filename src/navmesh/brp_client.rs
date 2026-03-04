@@ -26,7 +26,8 @@ pub(super) fn plugin(app: &mut App) {
             poll_remote_navmesh_input.run_if(resource_exists::<GetNavmeshInputRequestTask>),
             poll_navmesh_input.run_if(resource_exists::<GetNavmeshInputRequestTask>),
         )
-            .chain(),
+            .chain()
+            .run_if(in_state(crate::AppState::Editor)),
     );
 }
 

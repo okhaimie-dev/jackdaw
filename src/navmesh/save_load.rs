@@ -22,7 +22,8 @@ pub(super) fn plugin(app: &mut App) {
             poll_write_tasks,
             poll_load_task.run_if(resource_exists::<LoadTask>),
             poll_read_tasks,
-        ),
+        )
+            .run_if(in_state(crate::AppState::Editor)),
     );
 }
 

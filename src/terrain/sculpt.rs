@@ -19,7 +19,8 @@ pub(super) fn plugin(app: &mut App) {
             terrain_sculpt_interaction,
             handle_brush_resize_scroll,
             draw_terrain_brush_gizmo,
-        ),
+        )
+            .run_if(in_state(crate::AppState::Editor)),
     );
 }
 

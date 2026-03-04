@@ -84,7 +84,8 @@ impl Plugin for TransformGizmosPlugin {
                     handle_gizmo_drag,
                     draw_gizmos,
                 )
-                    .chain(),
+                    .chain()
+                    .run_if(in_state(crate::AppState::Editor)),
             );
     }
 }

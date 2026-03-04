@@ -15,7 +15,8 @@ use crate::{EditorEntity, selection::Selection};
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
         Update,
-        (toggle_toolbar_visibility, update_navmesh_viz_highlights),
+        (toggle_toolbar_visibility, update_navmesh_viz_highlights)
+            .run_if(in_state(crate::AppState::Editor)),
     );
     app.add_observer(on_viz_toggle_added);
 }

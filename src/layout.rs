@@ -91,9 +91,9 @@ pub fn editor_layout(icon_font: &IconFont) -> impl Bundle {
                 split_panel::panel_group(
                     0.15,
                     (
-                        Spawn((split_panel::panel(4), main_area(font))),
+                        Spawn((split_panel::panel(4), main_area(font.clone()))),
                         Spawn(split_panel::panel_handle()),
-                        Spawn((split_panel::panel(1), bottom_panels())),
+                        Spawn((split_panel::panel(1), bottom_panels(font))),
                     ),
                 ),
             ),
@@ -733,7 +733,7 @@ pub fn update_edit_tool_highlights(
     }
 }
 
-fn bottom_panels() -> impl Bundle {
+fn bottom_panels(icon_font: Handle<Font>) -> impl Bundle {
     (
         EditorEntity,
         Node {
@@ -745,11 +745,11 @@ fn bottom_panels() -> impl Bundle {
         split_panel::panel_group(
             0.15,
             (
-                Spawn((split_panel::panel(1), asset_browser::asset_browser_panel())),
+                Spawn((split_panel::panel(1), asset_browser::asset_browser_panel(icon_font.clone()))),
                 Spawn(split_panel::panel_handle()),
                 Spawn((
                     split_panel::panel(1),
-                    texture_browser::texture_browser_panel(),
+                    texture_browser::texture_browser_panel(icon_font),
                 )),
             ),
         ),

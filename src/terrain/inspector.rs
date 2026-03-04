@@ -18,7 +18,11 @@ use crate::selection::Selection;
 
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<TerrainGenerateState>()
-        .add_systems(Update, (update_terrain_inspector, sync_brush_fields))
+        .add_systems(
+            Update,
+            (update_terrain_inspector, sync_brush_fields)
+                .run_if(in_state(crate::AppState::Editor)),
+        )
         .add_observer(on_generate_clicked)
         .add_observer(on_erode_clicked)
         .add_observer(on_terrain_text_commit);

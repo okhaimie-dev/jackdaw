@@ -27,7 +27,8 @@ pub(super) fn setup_default_materials(
     ];
     for color in defaults {
         palette.materials.push(materials.add(StandardMaterial {
-            base_color: color,
+            base_color: color.with_alpha(0.75),
+            alpha_mode: AlphaMode::Blend,
             ..default()
         }));
     }

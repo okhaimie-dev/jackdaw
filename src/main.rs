@@ -1,10 +1,19 @@
-use bevy::prelude::*;
+use bevy::{asset::AssetPlugin, prelude::*};
 use jackdaw::EditorPlugin;
 
 fn main() -> AppExit {
+    let project_root = jackdaw::project::read_last_project()
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
     App::new()
-        .add_plugins((DefaultPlugins, EditorPlugin))
-        .add_systems(Startup, spawn_scene)
+        .add_plugins(
+            DefaultPlugins.set(AssetPlugin {
+                file_path: project_root.join("assets").to_string_lossy().to_string(),
+                ..default()
+            }),
+        )
+        .add_plugins(EditorPlugin)
+        .add_systems(OnEnter(jackdaw::AppState::Editor), spawn_scene)
         .run()
 }
 

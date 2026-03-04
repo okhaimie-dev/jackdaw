@@ -32,8 +32,10 @@ pub struct EntityOpsPlugin;
 impl Plugin for EntityOpsPlugin {
     fn build(&self, app: &mut App) {
         // Note: GltfSource type registration is handled by JsnPlugin
-        app.init_resource::<ComponentClipboard>()
-            .add_systems(Update, handle_entity_keys);
+        app.init_resource::<ComponentClipboard>().add_systems(
+            Update,
+            handle_entity_keys.run_if(in_state(crate::AppState::Editor)),
+        );
     }
 }
 
@@ -220,7 +222,13 @@ pub fn delete_selected(world: &mut World) {
         cmds.push(Box::new(DespawnEntity::from_world(world, entity)));
     }
 
-    // Clear selection
+    // Deselect entities before despawning so that `On<Remove, Selected>`
+    // observers can clean up tree-row UI while the entities still exist.
+    for &entity in &entities {
+        if let Ok(mut ec) = world.get_entity_mut(entity) {
+            ec.remove::<Selected>();
+        }
+    }
     let mut selection = world.resource_mut::<Selection>();
     selection.entities.clear();
 
@@ -742,8 +750,18 @@ fn to_asset_path(path: &str) -> String {
     path.to_string_lossy().to_string()
 }
 
-/// Get the absolute path of Bevy's assets directory, matching FileAssetReader logic.
+/// Get the absolute path of Bevy's assets directory.
+/// Uses the last-opened ProjectRoot if available, then falls back to
+/// the standard FileAssetReader lookup (BEVY_ASSET_ROOT / CARGO_MANIFEST_DIR / exe dir).
 fn get_assets_base_dir() -> Option<std::path::PathBuf> {
+    // Try ProjectRoot via recent projects config
+    if let Some(project_dir) = crate::project::read_last_project() {
+        let assets = project_dir.join("assets");
+        if assets.is_dir() {
+            return Some(assets);
+        }
+    }
+
     let base = if let Ok(dir) = std::env::var("BEVY_ASSET_ROOT") {
         std::path::PathBuf::from(dir)
     } else if let Ok(dir) = std::env::var("CARGO_MANIFEST_DIR") {

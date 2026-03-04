@@ -86,7 +86,8 @@ impl Plugin for ModalTransformPlugin {
                     viewport_drag_update,
                     viewport_drag_finish,
                 )
-                    .chain(),
+                    .chain()
+                    .run_if(in_state(crate::AppState::Editor)),
             );
     }
 }

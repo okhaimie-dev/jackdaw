@@ -20,7 +20,9 @@ impl Plugin for AlignmentGuidesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AlignmentGuideState>().add_systems(
             Update,
-            (cache_reference_aabbs, draw_alignment_guides).chain(),
+            (cache_reference_aabbs, draw_alignment_guides)
+                .chain()
+                .run_if(in_state(crate::AppState::Editor)),
         );
     }
 }

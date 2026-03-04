@@ -101,7 +101,8 @@ impl Plugin for InspectorPlugin {
                     reflect_fields::refresh_inspector_fields,
                     component_picker::filter_component_picker,
                     brush_display::update_brush_face_properties,
-                ),
+                )
+                    .run_if(in_state(crate::AppState::Editor)),
             );
     }
 }

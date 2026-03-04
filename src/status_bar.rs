@@ -22,7 +22,8 @@ impl Plugin for StatusBarPlugin {
                 update_status_left,
                 update_status_center,
                 update_status_right,
-            ),
+            )
+                .run_if(in_state(crate::AppState::Editor)),
         );
     }
 }

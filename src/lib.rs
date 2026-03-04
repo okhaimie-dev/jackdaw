@@ -13,6 +13,8 @@ pub mod inspector;
 pub mod layout;
 pub mod modal_transform;
 pub mod navmesh;
+pub mod project;
+pub mod project_select;
 pub mod scene_io;
 pub mod selection;
 pub mod snapping;
@@ -36,6 +38,13 @@ use jackdaw_feathers::EditorFeathersPlugin;
 use jackdaw_widgets::menu_bar::MenuAction;
 use selection::Selection;
 
+#[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum AppState {
+    #[default]
+    ProjectSelect,
+    Editor,
+}
+
 #[derive(Component, Default)]
 pub struct EditorEntity;
 
@@ -51,52 +60,58 @@ impl Plugin for EditorPlugin {
     fn build(&self, app: &mut App) {
         // Disable InputDispatchPlugin from FeathersPlugins because bevy_ui_text_input's
         // TextInputPlugin also adds it unconditionally and panics on duplicates.
-        app.add_plugins((
-            FeathersPlugins.build().disable::<InputDispatchPlugin>(),
-            EditorFeathersPlugin,
-            jackdaw_jsn::JsnPlugin,
-            inspector::InspectorPlugin,
-            hierarchy::HierarchyPlugin,
-            viewport::ViewportPlugin,
-            gizmos::TransformGizmosPlugin,
-            commands::CommandHistoryPlugin,
-            selection::SelectionPlugin,
-            entity_ops::EntityOpsPlugin,
-            scene_io::SceneIoPlugin,
-            asset_browser::AssetBrowserPlugin,
-            viewport_select::ViewportSelectPlugin,
-            snapping::SnappingPlugin,
-        ))
-        .add_plugins((
-            viewport_overlays::ViewportOverlaysPlugin,
-            view_modes::ViewModesPlugin,
-            status_bar::StatusBarPlugin,
-            modal_transform::ModalTransformPlugin,
-            custom_properties::CustomPropertiesPlugin,
-            entity_templates::EntityTemplatesPlugin,
-            brush::BrushPlugin,
-            texture_browser::TextureBrowserPlugin,
-            draw_brush::DrawBrushPlugin,
-            face_grid::FaceGridPlugin,
-            alignment_guides::AlignmentGuidesPlugin,
-            navmesh::NavmeshPlugin,
-            terrain::TerrainPlugin,
-        ))
-        .insert_resource(UiTheme(create_dark_theme()))
-        .init_resource::<layout::KeybindHelpPopover>()
-        .add_systems(Startup, (spawn_layout, populate_menu).chain())
-        .add_systems(
-            Update,
-            (
-                send_scroll_events,
-                layout::update_toolbar_highlights,
-                layout::update_space_toggle_label,
-                layout::update_edit_tool_highlights,
-                auto_hide_internal_entities,
-            ),
-        )
-        .add_observer(on_scroll)
-        .add_observer(handle_menu_action);
+        app.init_state::<AppState>()
+            .add_plugins((
+                FeathersPlugins.build().disable::<InputDispatchPlugin>(),
+                EditorFeathersPlugin,
+                jackdaw_jsn::JsnPlugin,
+                project_select::ProjectSelectPlugin,
+                inspector::InspectorPlugin,
+                hierarchy::HierarchyPlugin,
+                viewport::ViewportPlugin,
+                gizmos::TransformGizmosPlugin,
+                commands::CommandHistoryPlugin,
+                selection::SelectionPlugin,
+                entity_ops::EntityOpsPlugin,
+                scene_io::SceneIoPlugin,
+                asset_browser::AssetBrowserPlugin,
+                viewport_select::ViewportSelectPlugin,
+                snapping::SnappingPlugin,
+            ))
+            .add_plugins((
+                viewport_overlays::ViewportOverlaysPlugin,
+                view_modes::ViewModesPlugin,
+                status_bar::StatusBarPlugin,
+                modal_transform::ModalTransformPlugin,
+                custom_properties::CustomPropertiesPlugin,
+                entity_templates::EntityTemplatesPlugin,
+                brush::BrushPlugin,
+                texture_browser::TextureBrowserPlugin,
+                draw_brush::DrawBrushPlugin,
+                face_grid::FaceGridPlugin,
+                alignment_guides::AlignmentGuidesPlugin,
+                navmesh::NavmeshPlugin,
+                terrain::TerrainPlugin,
+            ))
+            .insert_resource(UiTheme(create_dark_theme()))
+            .init_resource::<layout::KeybindHelpPopover>()
+            .add_systems(
+                OnEnter(AppState::Editor),
+                (spawn_layout, populate_menu).chain(),
+            )
+            .add_systems(
+                Update,
+                (
+                    send_scroll_events,
+                    layout::update_toolbar_highlights,
+                    layout::update_space_toggle_label,
+                    layout::update_edit_tool_highlights,
+                    auto_hide_internal_entities,
+                )
+                    .run_if(in_state(AppState::Editor)),
+            )
+            .add_observer(on_scroll)
+            .add_observer(handle_menu_action);
     }
 }
 
@@ -185,6 +200,7 @@ fn populate_menu(world: &mut World) {
                     ("view.bounding_boxes", "Toggle Bounding Boxes"),
                     ("view.bounding_box_mode", "Cycle Bounding Box Mode"),
                     ("view.face_grid", "Toggle Face Grid"),
+                    ("view.brush_wireframe", "Toggle Brush Wireframe"),
                     ("view.alignment_guides", "Toggle Alignment Guides"),
                 ],
             ),
@@ -295,6 +311,12 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
             commands.queue(|world: &mut World| {
                 let mut settings = world.resource_mut::<viewport_overlays::OverlaySettings>();
                 settings.show_face_grid = !settings.show_face_grid;
+            });
+        }
+        "view.brush_wireframe" => {
+            commands.queue(|world: &mut World| {
+                let mut settings = world.resource_mut::<viewport_overlays::OverlaySettings>();
+                settings.show_brush_wireframe = !settings.show_brush_wireframe;
             });
         }
         "view.alignment_guides" => {

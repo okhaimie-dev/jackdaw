@@ -65,7 +65,8 @@ pub(super) fn plugin(app: &mut App) {
         (
             rebuild_navmesh_visuals.run_if(resource_exists::<NavmeshHandleRes>),
             sync_navmesh_viz_visibility,
-        ),
+        )
+            .run_if(in_state(crate::AppState::Editor)),
     );
     app.add_observer(on_navmesh_region_removed);
 }

@@ -141,3 +141,24 @@ pub struct JsnAssets {
 /// Reserved for editor-specific state. Currently unused.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct JsnEditorState {}
+
+/// Top-level `project.jsn` file structure.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct JsnProject {
+    /// Format header (same as scene files).
+    pub jsn: JsnHeader,
+    /// Project configuration.
+    pub project: JsnProjectConfig,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct JsnProjectConfig {
+    /// Human-readable project name.
+    pub name: String,
+    /// Optional description.
+    #[serde(default)]
+    pub description: String,
+    /// Default scene to open (relative to project root, e.g. "assets/scenes/level1.jsn").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_scene: Option<String>,
+}
