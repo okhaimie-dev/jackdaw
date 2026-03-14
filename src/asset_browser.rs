@@ -53,7 +53,9 @@ fn setup_directory_watcher(root: &Path, commands: &mut Commands) {
             use notify::EventKind;
             if matches!(
                 event.kind,
-                EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(notify::event::ModifyKind::Name(_))
+                EventKind::Create(_)
+                    | EventKind::Remove(_)
+                    | EventKind::Modify(notify::event::ModifyKind::Name(_))
             ) {
                 let _ = tx.send(());
             }
@@ -1231,7 +1233,9 @@ fn check_watcher_events(
     mut material_browser: ResMut<crate::material_browser::MaterialBrowserState>,
 ) {
     let Some(watcher) = watcher else { return };
-    let Ok(rx) = watcher.receiver.lock() else { return };
+    let Ok(rx) = watcher.receiver.lock() else {
+        return;
+    };
     let mut changed = false;
     while rx.try_recv().is_ok() {
         changed = true;

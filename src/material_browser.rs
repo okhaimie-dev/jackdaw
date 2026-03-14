@@ -216,8 +216,7 @@ impl TextureSlot {
                     if mat.max_parallax_layer_count == 0.0 {
                         mat.max_parallax_layer_count = 32.0;
                     }
-                    mat.parallax_mapping_method =
-                        bevy::pbr::ParallaxMappingMethod::Occlusion;
+                    mat.parallax_mapping_method = bevy::pbr::ParallaxMappingMethod::Occlusion;
                 } else {
                     mat.parallax_depth_scale = 0.0;
                     mat.max_parallax_layer_count = 0.0;
@@ -309,10 +308,12 @@ fn detect_and_create_materials(
                     base_color_texture = Some(asset_server.load::<Image>(asset_path.clone()));
                 }
                 "normalgl" | "nor" | "nrm" | "nrml" | "norm" | "bump" | "bmp" | "n" | "normal" => {
-                    normal_map_texture = Some(asset_server.load_with_settings::<Image, ImageLoaderSettings>(
-                        asset_path.clone(),
-                        |s: &mut ImageLoaderSettings| s.is_srgb = false,
-                    ));
+                    normal_map_texture = Some(
+                        asset_server.load_with_settings::<Image, ImageLoaderSettings>(
+                            asset_path.clone(),
+                            |s: &mut ImageLoaderSettings| s.is_srgb = false,
+                        ),
+                    );
                 }
                 "orm" => {
                     let img = asset_server.load_with_settings::<Image, ImageLoaderSettings>(
@@ -328,30 +329,35 @@ fn detect_and_create_materials(
                 }
                 "metallic" | "metalness" | "metal" | "mtl" | "roughness" | "rough" | "rgh" => {
                     if metallic_roughness_texture.is_none() {
-                        metallic_roughness_texture =
-                            Some(asset_server.load_with_settings::<Image, ImageLoaderSettings>(
+                        metallic_roughness_texture = Some(
+                            asset_server.load_with_settings::<Image, ImageLoaderSettings>(
                                 asset_path.clone(),
                                 |s: &mut ImageLoaderSettings| s.is_srgb = false,
-                            ));
+                            ),
+                        );
                     }
                 }
                 "emission" | "emissive" | "emit" => {
                     emissive_texture = Some(asset_server.load::<Image>(asset_path.clone()));
                 }
                 "ao" | "ambient" | "occlusion" | "ambientocclusion" => {
-                    occlusion_texture = Some(asset_server.load_with_settings::<Image, ImageLoaderSettings>(
-                        asset_path.clone(),
-                        |s: &mut ImageLoaderSettings| s.is_srgb = false,
-                    ));
+                    occlusion_texture = Some(
+                        asset_server.load_with_settings::<Image, ImageLoaderSettings>(
+                            asset_path.clone(),
+                            |s: &mut ImageLoaderSettings| s.is_srgb = false,
+                        ),
+                    );
                 }
                 "displacement" | "displace" | "disp" | "dsp" | "height" | "heightmap" => {
                     // Skip 16-bit integer PNGs — Bevy decodes them as R16Uint which
                     // is incompatible with StandardMaterial's float-filterable depth_map slot.
                     if !is_16bit_png(Path::new(asset_path)) {
-                        depth_map = Some(asset_server.load_with_settings::<Image, ImageLoaderSettings>(
-                            asset_path.clone(),
-                            |s: &mut ImageLoaderSettings| s.is_srgb = false,
-                        ));
+                        depth_map = Some(
+                            asset_server.load_with_settings::<Image, ImageLoaderSettings>(
+                                asset_path.clone(),
+                                |s: &mut ImageLoaderSettings| s.is_srgb = false,
+                            ),
+                        );
                     }
                 }
                 _ => {}
@@ -581,7 +587,10 @@ fn save_catalog_if_dirty(world: &mut World) {
         .map(|e| (format!("@{}", e.name), e.handle.clone().untyped()))
         .collect();
 
-    let mut catalog_assets = world.resource::<crate::asset_catalog::AssetCatalog>().assets.clone();
+    let mut catalog_assets = world
+        .resource::<crate::asset_catalog::AssetCatalog>()
+        .assets
+        .clone();
     for (catalog_name, handle) in &entries {
         crate::scene_io::serialize_asset_into(
             world,
@@ -591,7 +600,9 @@ fn save_catalog_if_dirty(world: &mut World) {
             &mut catalog_assets,
         );
     }
-    world.resource_mut::<crate::asset_catalog::AssetCatalog>().assets = catalog_assets;
+    world
+        .resource_mut::<crate::asset_catalog::AssetCatalog>()
+        .assets = catalog_assets;
 
     crate::asset_catalog::save_catalog(world);
 }
@@ -954,12 +965,12 @@ fn update_preview_area(
 
     // Helper: spawn a label + numeric input row
     let spawn_param_row = |commands: &mut Commands,
-                                parent: Entity,
-                                label: &str,
-                                value: f32,
-                                min: f64,
-                                max: f64,
-                                param: MaterialParamInput| {
+                           parent: Entity,
+                           label: &str,
+                           value: f32,
+                           min: f64,
+                           max: f64,
+                           param: MaterialParamInput| {
         let row = commands
             .spawn((
                 Node {
@@ -1237,7 +1248,9 @@ fn poll_texture_slot_pick(world: &mut World) {
         slot.set_on(mat, Some(image_handle));
     }
 
-    world.resource_mut::<crate::asset_catalog::AssetCatalog>().dirty = true;
+    world
+        .resource_mut::<crate::asset_catalog::AssetCatalog>()
+        .dirty = true;
     world.resource_mut::<MaterialPreviewState>().set_changed();
 }
 
@@ -1529,11 +1542,9 @@ fn new_material_button(icon_font: Handle<Font>) -> impl Bundle {
             icon_font,
             tokens::TEXT_SECONDARY,
         ),
-        observe(
-            |_: On<Pointer<Click>>, mut commands: Commands| {
-                commands.trigger(CreateNewMaterial);
-            },
-        ),
+        observe(|_: On<Pointer<Click>>, mut commands: Commands| {
+            commands.trigger(CreateNewMaterial);
+        }),
     )
 }
 

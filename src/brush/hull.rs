@@ -173,13 +173,12 @@ pub(super) fn rebuild_brush_from_vertices(
         let old_face = &old_brush.faces[best_old];
 
         // Resolve UV axes from old face (texture lock: preserve axes)
-        let (u_axis, v_axis) = if old_face.uv_u_axis != Vec3::ZERO
-            && old_face.uv_v_axis != Vec3::ZERO
-        {
-            (old_face.uv_u_axis, old_face.uv_v_axis)
-        } else {
-            jackdaw_geometry::compute_face_tangent_axes(old_face.plane.normal)
-        };
+        let (u_axis, v_axis) =
+            if old_face.uv_u_axis != Vec3::ZERO && old_face.uv_v_axis != Vec3::ZERO {
+                (old_face.uv_u_axis, old_face.uv_v_axis)
+            } else {
+                jackdaw_geometry::compute_face_tangent_axes(old_face.plane.normal)
+            };
 
         // Remap hull vertex indices to input indices for metric computation
         let remapped_indices: Vec<usize> = hull_face
@@ -190,8 +189,7 @@ pub(super) fn rebuild_brush_from_vertices(
 
         // Compute UV centroids using the preserved axes
         let old_polygon = &old_face_polygons[best_old];
-        let (_, old_centroid) =
-            compute_face_uv_metrics(old_vertices, old_polygon, u_axis, v_axis);
+        let (_, old_centroid) = compute_face_uv_metrics(old_vertices, old_polygon, u_axis, v_axis);
         let (_, new_centroid) =
             compute_face_uv_metrics(new_vertices, &remapped_indices, u_axis, v_axis);
 

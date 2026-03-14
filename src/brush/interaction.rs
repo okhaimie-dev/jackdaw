@@ -666,10 +666,7 @@ pub(super) fn brush_vertex_interact(
     };
 
     // PageUp/PageDown: nudge selected vertices vertically (no cursor needed)
-    if !drag_state.active
-        && drag_state.pending.is_none()
-        && !brush_selection.vertices.is_empty()
-    {
+    if !drag_state.active && drag_state.pending.is_none() && !brush_selection.vertices.is_empty() {
         let nudge_dir = if keyboard.just_pressed(KeyCode::PageUp) {
             Some(1.0)
         } else if keyboard.just_pressed(KeyCode::PageDown) {
@@ -1011,10 +1008,7 @@ pub(super) fn brush_edge_interact(
     };
 
     // PageUp/PageDown: nudge selected edge vertices vertically (no cursor needed)
-    if !drag_state.active
-        && drag_state.pending.is_none()
-        && !brush_selection.edges.is_empty()
-    {
+    if !drag_state.active && drag_state.pending.is_none() && !brush_selection.edges.is_empty() {
         let nudge_dir = if keyboard.just_pressed(KeyCode::PageUp) {
             Some(1.0)
         } else if keyboard.just_pressed(KeyCode::PageDown) {

@@ -82,13 +82,12 @@ pub fn regenerate_brush_meshes(
             let positions: Vec<[f32; 3]> =
                 indices.iter().map(|&vi| vertices[vi].to_array()).collect();
             let normals: Vec<[f32; 3]> = vec![face_data.plane.normal.to_array(); indices.len()];
-            let (u_axis, v_axis) = if face_data.uv_u_axis != Vec3::ZERO
-                && face_data.uv_v_axis != Vec3::ZERO
-            {
-                (face_data.uv_u_axis, face_data.uv_v_axis)
-            } else {
-                compute_face_tangent_axes(face_data.plane.normal)
-            };
+            let (u_axis, v_axis) =
+                if face_data.uv_u_axis != Vec3::ZERO && face_data.uv_v_axis != Vec3::ZERO {
+                    (face_data.uv_u_axis, face_data.uv_v_axis)
+                } else {
+                    compute_face_tangent_axes(face_data.plane.normal)
+                };
             let uvs = compute_face_uvs(
                 &vertices,
                 indices,
