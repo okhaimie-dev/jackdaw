@@ -415,6 +415,14 @@ pub(super) fn brush_face_interact(
 
                 let cam_dist = (cam_tf.translation() - brush_pos).length();
                 let drag_amount = projected * cam_dist * 0.003;
+                let drag_amount = if snap_settings.translate_active(ctrl)
+                    && snap_settings.translate_increment > 0.0
+                {
+                    (drag_amount / snap_settings.translate_increment).round()
+                        * snap_settings.translate_increment
+                } else {
+                    drag_amount
+                };
 
                 for &face_idx in &brush_selection.faces {
                     if face_idx < start.faces.len() && face_idx < brush.faces.len() {
@@ -447,7 +455,15 @@ pub(super) fn brush_face_interact(
                 let projected = mouse_delta.dot(screen_dir);
 
                 let cam_dist = (cam_tf.translation() - face_centroid).length();
-                drag_state.extend_depth = projected * cam_dist * 0.003;
+                let raw_depth = projected * cam_dist * 0.003;
+                drag_state.extend_depth = if snap_settings.translate_active(ctrl)
+                    && snap_settings.translate_increment > 0.0
+                {
+                    (raw_depth / snap_settings.translate_increment).round()
+                        * snap_settings.translate_increment
+                } else {
+                    raw_depth
+                };
             }
         }
         return;

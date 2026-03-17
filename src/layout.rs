@@ -471,6 +471,7 @@ fn toolbar_edit_button(icon: Icon, tool: EditToolButton, font: Handle<Font>) -> 
                                 press_screen_pos: None,
                                 polygon_vertices: Vec::new(),
                                 polygon_cursor: None,
+                                diagonal_snap: false,
                             });
                         }
                     }

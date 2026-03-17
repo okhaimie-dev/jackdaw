@@ -185,12 +185,16 @@ fn handle_box_select(
     viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
     gizmo_drag: Res<GizmoDragState>,
     edit_mode: Res<crate::brush::EditMode>,
+    draw_state: Res<crate::draw_brush::DrawBrushState>,
     scene_entities: Query<(Entity, &GlobalTransform), (Without<EditorEntity>, With<Name>)>,
     mut selection: ResMut<Selection>,
     mut commands: Commands,
 ) {
-    // Don't box-select during gizmo drag or brush edit mode
-    if gizmo_drag.active || *edit_mode != crate::brush::EditMode::Object {
+    // Don't box-select during gizmo drag, brush edit mode, or draw mode
+    if gizmo_drag.active
+        || *edit_mode != crate::brush::EditMode::Object
+        || draw_state.active.is_some()
+    {
         box_state.active = false;
         return;
     }

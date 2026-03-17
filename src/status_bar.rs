@@ -149,6 +149,11 @@ fn update_status_right(
                     "DRAW BRUSH ({mode_label}): Drag to size rectangle, or release to place polygon vertices | Esc cancel"
                 )
             }
+            DrawPhase::DrawingRotatedWidth => {
+                format!(
+                    "DRAW BRUSH ({mode_label}): Move to set width, click to confirm | Esc cancel"
+                )
+            }
             DrawPhase::DrawingPolygon => {
                 let n = active.polygon_vertices.len();
                 if n >= 3 {

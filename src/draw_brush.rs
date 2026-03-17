@@ -34,6 +34,7 @@ const MIN_EXTRUDE_DEPTH: f32 = 0.01;
 pub enum DrawPhase {
     PlacingFirstCorner,
     DrawingFootprint,
+    DrawingRotatedWidth,
     DrawingPolygon,
     ExtrudingDepth,
 }
@@ -75,6 +76,8 @@ pub struct ActiveDraw {
     pub polygon_vertices: Vec<Vec3>,
     /// Current cursor position on plane during polygon mode (for preview edge).
     pub polygon_cursor: Option<Vec3>,
+    /// When true, constrain cursor to nearest 45° angle from last vertex.
+    pub diagonal_snap: bool,
 }
 
 #[derive(Resource, Default)]
@@ -235,6 +238,7 @@ fn draw_brush_activate(
         press_screen_pos: None,
         polygon_vertices: Vec::new(),
         polygon_cursor: None,
+        diagonal_snap: false,
     });
 }
 
@@ -271,6 +275,8 @@ fn draw_brush_update(
     };
 
     let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
+    let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
+    active.diagonal_snap = shift;
 
     match active.phase {
         DrawPhase::PlacingFirstCorner => {
@@ -321,7 +327,7 @@ fn draw_brush_update(
             // Project cursor onto current plane
             if let Some(hit) = ray_plane_intersection(ray, active.plane.origin, active.plane.normal)
             {
-                let snapped = snap_to_plane_grid(hit, &active.plane, &snap_settings, ctrl);
+                let snapped = snap_to_plane_grid(hit, &active.plane, &snap_settings, false);
                 active.cursor_on_plane = Some(snapped);
             }
         }
@@ -329,15 +335,51 @@ fn draw_brush_update(
             // Project cursor onto the locked drawing plane
             if let Some(hit) = ray_plane_intersection(ray, active.plane.origin, active.plane.normal)
             {
-                let snapped = snap_to_plane_grid(hit, &active.plane, &snap_settings, ctrl);
+                let mut snapped = snap_to_plane_grid(hit, &active.plane, &snap_settings, false);
+                if shift {
+                    snapped = snap_to_diagonal(snapped, active.corner1, &active.plane);
+                    snapped = snap_to_plane_grid(snapped, &active.plane, &snap_settings, false);
+                }
+                active.polygon_vertices.clear();
                 active.corner2 = snapped;
+            }
+        }
+        DrawPhase::DrawingRotatedWidth => {
+            if let Some(hit) = ray_plane_intersection(ray, active.plane.origin, active.plane.normal)
+            {
+                let snapped = snap_to_plane_grid(hit, &active.plane, &snap_settings, false);
+                let line_vec = active.corner2 - active.corner1;
+                let line_dir = line_vec.normalize();
+                let axis_perp = active.plane.normal.cross(line_dir).normalize();
+                let raw_width = (snapped - active.corner1).dot(axis_perp);
+                // Snap width to grid
+                let width = if snap_settings.translate_active(ctrl)
+                    && snap_settings.translate_increment > 0.0
+                {
+                    (raw_width / snap_settings.translate_increment).round()
+                        * snap_settings.translate_increment
+                } else {
+                    raw_width
+                };
+                active.polygon_vertices = vec![
+                    active.corner1,
+                    active.corner2,
+                    active.corner2 + axis_perp * width,
+                    active.corner1 + axis_perp * width,
+                ];
             }
         }
         DrawPhase::DrawingPolygon => {
             // Project cursor onto drawing plane
             if let Some(hit) = ray_plane_intersection(ray, active.plane.origin, active.plane.normal)
             {
-                let snapped = snap_to_plane_grid(hit, &active.plane, &snap_settings, ctrl);
+                let mut snapped = snap_to_plane_grid(hit, &active.plane, &snap_settings, false);
+                if shift {
+                    if let Some(&last) = active.polygon_vertices.last() {
+                        snapped = snap_to_diagonal(snapped, last, &active.plane);
+                        snapped = snap_to_plane_grid(snapped, &active.plane, &snap_settings, false);
+                    }
+                }
                 active.polygon_cursor = Some(snapped);
             }
         }
@@ -414,14 +456,22 @@ fn draw_brush_release(
 
     let screen_dist = (cursor_pos - press_pos).length();
     if screen_dist > 5.0 {
-        // Real drag: check footprint size, transition to ExtrudingDepth
-        let delta = active.corner2 - active.corner1;
-        let u_size = delta.dot(active.plane.axis_u).abs();
-        let v_size = delta.dot(active.plane.axis_v).abs();
-        if u_size >= MIN_FOOTPRINT_SIZE && v_size >= MIN_FOOTPRINT_SIZE {
-            active.phase = DrawPhase::ExtrudingDepth;
-            active.extrude_start_cursor = viewport_cursor;
-            active.depth = 0.0;
+        if active.diagonal_snap {
+            // Shift+drag: check line length, transition to rotated width phase
+            let line_len = (active.corner2 - active.corner1).length();
+            if line_len >= MIN_FOOTPRINT_SIZE {
+                active.phase = DrawPhase::DrawingRotatedWidth;
+            }
+        } else {
+            // Normal drag: check footprint size, transition to ExtrudingDepth
+            let delta = active.corner2 - active.corner1;
+            if delta.dot(active.plane.axis_u).abs() >= MIN_FOOTPRINT_SIZE
+                && delta.dot(active.plane.axis_v).abs() >= MIN_FOOTPRINT_SIZE
+            {
+                active.phase = DrawPhase::ExtrudingDepth;
+                active.extrude_start_cursor = viewport_cursor;
+                active.depth = 0.0;
+            }
         }
     } else {
         // Click (no drag): enter polygon mode
@@ -474,20 +524,29 @@ fn draw_brush_confirm(
             }
         }
         DrawPhase::DrawingFootprint => {
-            // Only handle non-drag mode (legacy click-move-click path, not used in normal flow)
             if active.drag_footprint {
                 return;
             }
-            // Enforce minimum size
             let delta = active.corner2 - active.corner1;
-            let u_size = delta.dot(active.plane.axis_u).abs();
-            let v_size = delta.dot(active.plane.axis_v).abs();
-            if u_size < MIN_FOOTPRINT_SIZE || v_size < MIN_FOOTPRINT_SIZE {
-                return; // Too small, keep drawing
+            if delta.dot(active.plane.axis_u).abs() < MIN_FOOTPRINT_SIZE
+                || delta.dot(active.plane.axis_v).abs() < MIN_FOOTPRINT_SIZE
+            {
+                return;
             }
             active.phase = DrawPhase::ExtrudingDepth;
             active.extrude_start_cursor = viewport_cursor;
             active.depth = 0.0;
+        }
+        DrawPhase::DrawingRotatedWidth => {
+            if active.polygon_vertices.len() == 4 {
+                let edge1 = (active.polygon_vertices[1] - active.polygon_vertices[0]).length();
+                let edge2 = (active.polygon_vertices[3] - active.polygon_vertices[0]).length();
+                if edge1 >= MIN_FOOTPRINT_SIZE && edge2 >= MIN_FOOTPRINT_SIZE {
+                    active.phase = DrawPhase::ExtrudingDepth;
+                    active.extrude_start_cursor = viewport_cursor;
+                    active.depth = 0.0;
+                }
+            }
         }
         DrawPhase::DrawingPolygon => {
             if let Some(cursor) = active.polygon_cursor {
@@ -634,15 +693,36 @@ fn draw_brush_preview(
             }
         }
         DrawPhase::DrawingFootprint => {
-            // Rectangle on the plane from corner1 to corner2
-            let corners = footprint_corners(active);
-            for i in 0..4 {
-                gizmos.line(corners[i], corners[(i + 1) % 4], color);
+            if active.diagonal_snap {
+                // Phase 1: show the line being drawn
+                gizmos.line(active.corner1, active.corner2, color);
+                let mid = (active.corner1 + active.corner2) / 2.0;
+                draw_plane_grid(&mut gizmos, &active.plane, mid, &snap_settings);
+            } else {
+                // Normal axis-aligned rectangle
+                let corners = footprint_corners(active);
+                for i in 0..4 {
+                    gizmos.line(corners[i], corners[(i + 1) % 4], color);
+                }
+                let mid = (active.corner1 + active.corner2) / 2.0;
+                draw_plane_grid(&mut gizmos, &active.plane, mid, &snap_settings);
             }
-
-            // Draw plane grid overlay centered on midpoint of footprint
-            let mid = (active.corner1 + active.corner2) / 2.0;
-            draw_plane_grid(&mut gizmos, &active.plane, mid, &snap_settings);
+        }
+        DrawPhase::DrawingRotatedWidth => {
+            if active.polygon_vertices.len() == 4 {
+                for i in 0..4 {
+                    gizmos.line(
+                        active.polygon_vertices[i],
+                        active.polygon_vertices[(i + 1) % 4],
+                        color,
+                    );
+                }
+                let mid = active.polygon_vertices.iter().sum::<Vec3>() / 4.0;
+                draw_plane_grid(&mut gizmos, &active.plane, mid, &snap_settings);
+            } else {
+                // Before first mouse move, show just the locked line
+                gizmos.line(active.corner1, active.corner2, color);
+            }
         }
         DrawPhase::DrawingPolygon => {
             let verts = &active.polygon_vertices;
@@ -1073,6 +1153,20 @@ fn snap_to_plane_grid(
     let v = hit.dot(plane.axis_v);
     let snapped_u = (u / inc).round() * inc;
     let snapped_v = (v / inc).round() * inc;
+    let plane_d = plane.origin.dot(plane.normal);
+    plane.axis_u * snapped_u + plane.axis_v * snapped_v + plane.normal * plane_d
+}
+
+/// Constrain a hit point to the nearest 45° angle from an origin on the drawing plane.
+fn snap_to_diagonal(hit: Vec3, origin: Vec3, plane: &DrawPlane) -> Vec3 {
+    let delta_u = hit.dot(plane.axis_u) - origin.dot(plane.axis_u);
+    let delta_v = hit.dot(plane.axis_v) - origin.dot(plane.axis_v);
+    let angle = delta_v.atan2(delta_u);
+    let snapped_angle =
+        (angle / std::f32::consts::FRAC_PI_4).round() * std::f32::consts::FRAC_PI_4;
+    let distance = (delta_u * delta_u + delta_v * delta_v).sqrt();
+    let snapped_u = origin.dot(plane.axis_u) + distance * snapped_angle.cos();
+    let snapped_v = origin.dot(plane.axis_v) + distance * snapped_angle.sin();
     let plane_d = plane.origin.dot(plane.normal);
     plane.axis_u * snapped_u + plane.axis_v * snapped_v + plane.normal * plane_d
 }

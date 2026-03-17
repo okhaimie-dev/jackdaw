@@ -71,7 +71,7 @@ fn sync_grid_settings(
     }
 }
 
-pub const GRID_POWER_MIN: i32 = -3;
+pub const GRID_POWER_MIN: i32 = -5;
 pub const GRID_POWER_MAX: i32 = 8;
 
 #[derive(Resource)]
