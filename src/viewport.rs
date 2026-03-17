@@ -35,7 +35,13 @@ impl Plugin for ViewportPlugin {
             .add_systems(
                 Update,
                 (update_camera_enabled, handle_camera_keys)
-                    .run_if(in_state(crate::AppState::Editor)),
+                    .in_set(crate::EditorInteraction),
+            )
+            .add_systems(
+                Update,
+                disable_camera_on_dialog
+                    .run_if(in_state(crate::AppState::Editor))
+                    .run_if(not(crate::no_dialog_open)),
             );
     }
 }
@@ -204,6 +210,13 @@ fn find_ancestor_component<'a, C: Component>(
 }
 
 /// Enable/disable camera controls based on viewport hover, modal state, etc.
+/// Force-disable camera controls when any dialog is open.
+fn disable_camera_on_dialog(mut camera_query: Query<&mut JackdawCameraSettings>) {
+    for mut settings in &mut camera_query {
+        settings.enabled = false;
+    }
+}
+
 fn update_camera_enabled(
     windows: Query<&Window>,
     viewport_node: Single<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
@@ -257,6 +270,7 @@ pub struct CameraBookmark {
 
 fn handle_camera_keys(
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     selection: Res<Selection>,
     selected_transforms: Query<&GlobalTransform, With<Selected>>,
     mut camera_query: Query<&mut Transform, With<JackdawCameraSettings>>,
@@ -264,15 +278,13 @@ fn handle_camera_keys(
     modal: Res<crate::modal_transform::ModalTransformState>,
     edit_mode: Res<crate::brush::EditMode>,
 ) {
+    use crate::keybinds::EditorAction;
+
     if modal.active.is_some() {
         return;
     }
 
-    let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
-    let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
-
-    // F key (without Shift): focus on selected entity
-    if keyboard.just_pressed(KeyCode::KeyF) && !shift {
+    if keybinds.just_pressed(EditorAction::FocusSelected, &keyboard) {
         if let Some(primary) = selection.primary() {
             if let Ok(global_tf) = selected_transforms.get(primary) {
                 let target = global_tf.translation();
@@ -280,7 +292,6 @@ fn handle_camera_keys(
                 let dist = (scale.length() * 3.0).max(5.0);
 
                 for mut transform in &mut camera_query {
-                    // Move camera to look at target from current viewing direction
                     let forward = transform.forward().as_vec3();
                     transform.translation = target - forward * dist;
                     *transform = transform.looking_at(target, Vec3::Y);
@@ -289,34 +300,45 @@ fn handle_camera_keys(
         }
     }
 
-    // Number keys: camera bookmarks
-    let bookmark_keys = [
-        (KeyCode::Digit1, 0),
-        (KeyCode::Digit2, 1),
-        (KeyCode::Digit3, 2),
-        (KeyCode::Digit4, 3),
-        (KeyCode::Digit5, 4),
-        (KeyCode::Digit6, 5),
-        (KeyCode::Digit7, 6),
-        (KeyCode::Digit8, 7),
-        (KeyCode::Digit9, 8),
+    // Camera bookmarks
+    let save_actions = [
+        (EditorAction::SaveBookmark1, 0),
+        (EditorAction::SaveBookmark2, 1),
+        (EditorAction::SaveBookmark3, 2),
+        (EditorAction::SaveBookmark4, 3),
+        (EditorAction::SaveBookmark5, 4),
+        (EditorAction::SaveBookmark6, 5),
+        (EditorAction::SaveBookmark7, 6),
+        (EditorAction::SaveBookmark8, 7),
+        (EditorAction::SaveBookmark9, 8),
+    ];
+    let load_actions = [
+        (EditorAction::LoadBookmark1, 0),
+        (EditorAction::LoadBookmark2, 1),
+        (EditorAction::LoadBookmark3, 2),
+        (EditorAction::LoadBookmark4, 3),
+        (EditorAction::LoadBookmark5, 4),
+        (EditorAction::LoadBookmark6, 5),
+        (EditorAction::LoadBookmark7, 6),
+        (EditorAction::LoadBookmark8, 7),
+        (EditorAction::LoadBookmark9, 8),
     ];
 
-    for (key, index) in bookmark_keys {
-        if keyboard.just_pressed(key) {
-            if ctrl {
-                // Save bookmark (always works)
-                for transform in &camera_query {
-                    bookmarks.slots[index] = Some(CameraBookmark {
-                        transform: *transform,
-                    });
-                }
-            } else if *edit_mode == crate::brush::EditMode::Object {
-                // Restore bookmark (only in Object mode — number keys are edit modes in brush edit)
-                if let Some(bookmark) = bookmarks.slots[index] {
-                    for mut transform in &mut camera_query {
-                        *transform = bookmark.transform;
-                    }
+    for (action, index) in save_actions {
+        if keybinds.just_pressed(action, &keyboard) {
+            for transform in &camera_query {
+                bookmarks.slots[index] = Some(CameraBookmark {
+                    transform: *transform,
+                });
+            }
+        }
+    }
+    for (action, index) in load_actions {
+        if keybinds.just_pressed(action, &keyboard) && *edit_mode == crate::brush::EditMode::Object
+        {
+            if let Some(bookmark) = bookmarks.slots[index] {
+                for mut transform in &mut camera_query {
+                    *transform = bookmark.transform;
                 }
             }
         }

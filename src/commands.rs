@@ -19,7 +19,7 @@ impl Plugin for CommandHistoryPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CommandHistory::default()).add_systems(
             Update,
-            handle_undo_redo_keys.run_if(in_state(crate::AppState::Editor)),
+            handle_undo_redo_keys.in_set(crate::EditorInteraction),
         );
     }
 }
@@ -323,24 +323,23 @@ pub(crate) fn snapshot_rebuild(scene: &DynamicScene) -> DynamicScene {
 
 fn handle_undo_redo_keys(world: &mut World) {
     let keyboard = world.resource::<ButtonInput<KeyCode>>();
-    let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
-    let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
-    let z_pressed = keyboard.just_pressed(KeyCode::KeyZ);
+    let keybinds = world.resource::<crate::keybinds::KeybindRegistry>();
+    let undo = keybinds.just_pressed(crate::keybinds::EditorAction::Undo, keyboard);
+    let redo = keybinds.just_pressed(crate::keybinds::EditorAction::Redo, keyboard);
 
-    if !ctrl || !z_pressed {
+    if !undo && !redo {
         return;
     }
 
     let mut history = world.resource_mut::<CommandHistory>();
-    // Take ownership to avoid borrow conflict with world
-    let command = if shift {
+    let command = if redo {
         history.redo_stack.pop()
     } else {
         history.undo_stack.pop()
     };
 
     if let Some(command) = command {
-        if shift {
+        if redo {
             command.execute(world);
             world
                 .resource_mut::<CommandHistory>()

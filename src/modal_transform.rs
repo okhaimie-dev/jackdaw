@@ -84,7 +84,7 @@ impl Plugin for ModalTransformPlugin {
                     viewport_drag_finish,
                 )
                     .chain()
-                    .run_if(in_state(crate::AppState::Editor)),
+                    .in_set(crate::EditorInteraction),
             );
     }
 }
@@ -92,6 +92,7 @@ impl Plugin for ModalTransformPlugin {
 #[allow(dead_code)]
 fn modal_activate(
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     input_focus: Res<InputFocus>,
     selection: Res<Selection>,
     transforms: Query<&Transform, With<Selected>>,
@@ -105,6 +106,8 @@ fn modal_activate(
     edit_mode: Res<crate::brush::EditMode>,
     draw_state: Res<crate::draw_brush::DrawBrushState>,
 ) {
+    use crate::keybinds::EditorAction;
+
     if modal.active.is_some() || gizmo_drag.active || input_focus.0.is_some() {
         return;
     }
@@ -114,13 +117,11 @@ fn modal_activate(
         return;
     }
 
-    let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
-
-    let op = if keyboard.just_pressed(KeyCode::KeyG) {
+    let op = if keybinds.just_pressed(EditorAction::ModalGrab, &keyboard) {
         Some(ModalOp::Grab)
-    } else if keyboard.just_pressed(KeyCode::KeyR) && !ctrl {
+    } else if keybinds.just_pressed(EditorAction::ModalRotate, &keyboard) {
         Some(ModalOp::Rotate)
-    } else if keyboard.just_pressed(KeyCode::KeyS) && !ctrl {
+    } else if keybinds.just_pressed(EditorAction::ModalScale, &keyboard) {
         Some(ModalOp::Scale)
     } else {
         None
@@ -170,26 +171,32 @@ fn modal_activate(
 }
 
 #[allow(dead_code)]
-fn modal_constrain(keyboard: Res<ButtonInput<KeyCode>>, mut modal: ResMut<ModalTransformState>) {
+fn modal_constrain(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
+    mut modal: ResMut<ModalTransformState>,
+) {
+    use crate::keybinds::EditorAction;
+
     let Some(ref mut active) = modal.active else {
         return;
     };
 
     let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
 
-    if keyboard.just_pressed(KeyCode::KeyX) {
+    if keybinds.just_pressed(EditorAction::ModalConstrainX, &keyboard) {
         active.constraint = if shift {
             ModalConstraint::Plane(GizmoAxis::X)
         } else {
             ModalConstraint::Axis(GizmoAxis::X)
         };
-    } else if keyboard.just_pressed(KeyCode::KeyY) {
+    } else if keybinds.just_pressed(EditorAction::ModalConstrainY, &keyboard) {
         active.constraint = if shift {
             ModalConstraint::Plane(GizmoAxis::Y)
         } else {
             ModalConstraint::Axis(GizmoAxis::Y)
         };
-    } else if keyboard.just_pressed(KeyCode::KeyZ) {
+    } else if keybinds.just_pressed(EditorAction::ModalConstrainZ, &keyboard) {
         active.constraint = if shift {
             ModalConstraint::Plane(GizmoAxis::Z)
         } else {
@@ -378,6 +385,7 @@ fn modal_grab(
 fn modal_confirm(
     mouse: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     mut modal: ResMut<ModalTransformState>,
     transforms: Query<&Transform, With<Selected>>,
     mut history: ResMut<CommandHistory>,
@@ -387,7 +395,9 @@ fn modal_confirm(
         return;
     };
 
-    if !mouse.just_pressed(MouseButton::Left) && !keyboard.just_pressed(KeyCode::Enter) {
+    if !mouse.just_pressed(MouseButton::Left)
+        && !keybinds.just_pressed(crate::keybinds::EditorAction::ModalConfirm, &keyboard)
+    {
         return;
     }
 
@@ -411,6 +421,7 @@ fn modal_confirm(
 fn modal_cancel(
     mouse: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     mut modal: ResMut<ModalTransformState>,
     mut transforms: Query<&mut Transform, With<Selected>>,
     mut cursor_query: Query<&mut CursorOptions, With<Window>>,
@@ -419,7 +430,9 @@ fn modal_cancel(
         return;
     };
 
-    if !mouse.just_pressed(MouseButton::Right) && !keyboard.just_pressed(KeyCode::Escape) {
+    if !mouse.just_pressed(MouseButton::Right)
+        && !keybinds.just_pressed(crate::keybinds::EditorAction::ModalCancel, &keyboard)
+    {
         return;
     }
 

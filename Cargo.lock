@@ -4323,6 +4323,7 @@ name = "jackdaw_camera"
 version = "0.1.5"
 dependencies = [
  "bevy",
+ "jackdaw_commands",
 ]
 
 [[package]]
@@ -4330,6 +4331,7 @@ name = "jackdaw_commands"
 version = "0.1.5"
 dependencies = [
  "bevy",
+ "serde",
 ]
 
 [[package]]

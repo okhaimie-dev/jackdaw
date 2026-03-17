@@ -32,7 +32,7 @@ pub struct RecentEntry {
     pub last_opened: String,
 }
 
-fn config_dir() -> Option<PathBuf> {
+pub fn config_dir() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("jackdaw"))
 }
 

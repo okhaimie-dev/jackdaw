@@ -2,6 +2,7 @@ use bevy::{
     input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
     prelude::*,
 };
+use jackdaw_commands::keybinds::{EditorAction, KeybindRegistry};
 
 pub struct JackdawCameraPlugin;
 
@@ -48,6 +49,7 @@ impl Default for JackdawCameraSettings {
 
 fn camera_system(
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<KeybindRegistry>,
     mouse: Res<ButtonInput<MouseButton>>,
     mut mouse_motion: MessageReader<MouseMotion>,
     mut scroll_events: MessageReader<MouseWheel>,
@@ -112,22 +114,22 @@ fn camera_system(
         let dt = time.delta_secs();
         let mut movement = Vec3::ZERO;
 
-        if !ctrl && !alt && keyboard.pressed(KeyCode::KeyW) {
+        if !ctrl && !alt && keybinds.key_pressed(EditorAction::CameraForward, &keyboard) {
             movement += transform.forward().as_vec3();
         }
-        if !ctrl && !alt && keyboard.pressed(KeyCode::KeyS) {
+        if !ctrl && !alt && keybinds.key_pressed(EditorAction::CameraBackward, &keyboard) {
             movement -= transform.forward().as_vec3();
         }
-        if !ctrl && !alt && keyboard.pressed(KeyCode::KeyA) {
+        if !ctrl && !alt && keybinds.key_pressed(EditorAction::CameraLeft, &keyboard) {
             movement -= transform.right().as_vec3();
         }
-        if !ctrl && !alt && keyboard.pressed(KeyCode::KeyD) {
+        if !ctrl && !alt && keybinds.key_pressed(EditorAction::CameraRight, &keyboard) {
             movement += transform.right().as_vec3();
         }
-        if !ctrl && !alt && keyboard.pressed(KeyCode::KeyQ) {
+        if !ctrl && !alt && keybinds.key_pressed(EditorAction::CameraUp, &keyboard) {
             movement += Vec3::Y;
         }
-        if !ctrl && !alt && keyboard.pressed(KeyCode::KeyE) {
+        if !ctrl && !alt && keybinds.key_pressed(EditorAction::CameraDown, &keyboard) {
             movement -= Vec3::Y;
         }
 

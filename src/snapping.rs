@@ -13,8 +13,12 @@ impl Plugin for SnappingPlugin {
             .init_resource::<GridSettings>()
             .add_systems(
                 Update,
-                (handle_grid_size_keys, sync_grid_settings)
-                    .chain()
+                handle_grid_size_keys.in_set(crate::EditorInteraction),
+            )
+            .add_systems(
+                Update,
+                sync_grid_settings
+                    .after(handle_grid_size_keys)
                     .run_if(in_state(crate::AppState::Editor)),
             );
     }
@@ -201,6 +205,7 @@ impl SnapSettings {
 
 fn handle_grid_size_keys(
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     input_focus: Res<InputFocus>,
     modal: Res<crate::modal_transform::ModalTransformState>,
     terrain_edit_mode: Res<crate::terrain::TerrainEditMode>,
@@ -243,11 +248,11 @@ fn handle_grid_size_keys(
     }
 
     // Bracket keys: alternative grid size control
-    if keyboard.just_pressed(KeyCode::BracketLeft) {
+    if keybinds.just_pressed(crate::keybinds::EditorAction::DecreaseGrid, &keyboard) {
         snap.grid_power = (snap.grid_power - 1).max(GRID_POWER_MIN);
         changed = true;
     }
-    if keyboard.just_pressed(KeyCode::BracketRight) {
+    if keybinds.just_pressed(crate::keybinds::EditorAction::IncreaseGrid, &keyboard) {
         snap.grid_power = (snap.grid_power + 1).min(GRID_POWER_MAX);
         changed = true;
     }

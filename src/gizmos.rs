@@ -81,9 +81,14 @@ impl Plugin for TransformGizmosPlugin {
                     handle_gizmo_mode_keys,
                     handle_gizmo_hover,
                     handle_gizmo_drag,
-                    draw_gizmos,
                 )
                     .chain()
+                    .in_set(crate::EditorInteraction),
+            )
+            .add_systems(
+                Update,
+                draw_gizmos
+                    .after(handle_gizmo_drag)
                     .run_if(in_state(crate::AppState::Editor)),
             );
     }
@@ -91,6 +96,7 @@ impl Plugin for TransformGizmosPlugin {
 
 fn handle_gizmo_mode_keys(
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     mut mode: ResMut<GizmoMode>,
     mut space: ResMut<GizmoSpace>,
     drag_state: Res<GizmoDragState>,
@@ -105,18 +111,18 @@ fn handle_gizmo_mode_keys(
         return;
     }
 
-    // R = Rotate, T = Scale, Escape = reset to Translate
-    if keyboard.just_pressed(KeyCode::KeyR) {
+    use crate::keybinds::EditorAction;
+
+    if keybinds.just_pressed(EditorAction::GizmoRotate, &keyboard) {
         *mode = GizmoMode::Rotate;
     }
-    if keyboard.just_pressed(KeyCode::KeyT) {
+    if keybinds.just_pressed(EditorAction::GizmoScale, &keyboard) {
         *mode = GizmoMode::Scale;
     }
-    if keyboard.just_pressed(KeyCode::Escape) {
+    if keybinds.just_pressed(EditorAction::GizmoTranslate, &keyboard) {
         *mode = GizmoMode::Translate;
     }
-    // Toggle world/local space
-    if keyboard.just_pressed(KeyCode::KeyX) {
+    if keybinds.just_pressed(EditorAction::ToggleGizmoSpace, &keyboard) {
         *space = match *space {
             GizmoSpace::World => GizmoSpace::Local,
             GizmoSpace::Local => GizmoSpace::World,

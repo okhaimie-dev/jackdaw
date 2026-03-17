@@ -133,14 +133,20 @@ impl Plugin for DrawBrushPlugin {
                     draw_brush_release,
                     draw_brush_confirm,
                     draw_brush_cancel,
-                    draw_brush_preview,
-                    manage_draw_preview_mesh.after(crate::brush::mesh::regenerate_brush_meshes),
                     join_selected_brushes,
                     csg_subtract_selected,
                     csg_intersect_selected,
                     extend_face_to_brush,
                 )
                     .chain()
+                    .in_set(crate::EditorInteraction),
+            )
+            .add_systems(
+                Update,
+                (
+                    draw_brush_preview.after(draw_brush_cancel),
+                    manage_draw_preview_mesh.after(crate::brush::mesh::regenerate_brush_meshes),
+                )
                     .run_if(in_state(crate::AppState::Editor)),
             );
     }
@@ -154,6 +160,7 @@ fn configure_draw_brush_gizmos(mut config_store: ResMut<GizmoConfigStore>) {
 fn draw_brush_activate(
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     input_focus: Res<InputFocus>,
     mut draw_state: ResMut<DrawBrushState>,
     modal: Res<crate::modal_transform::ModalTransformState>,
@@ -162,9 +169,11 @@ fn draw_brush_activate(
     selection: Res<Selection>,
     brush_query: Query<(), With<Brush>>,
 ) {
+    use crate::keybinds::EditorAction;
+
     // Handle Tab toggle while in draw mode (works in all phases)
     if let Some(ref mut active) = draw_state.active {
-        if keyboard.just_pressed(KeyCode::Tab) {
+        if keybinds.just_pressed(EditorAction::ToggleDrawMode, &keyboard) {
             active.mode = match active.mode {
                 DrawMode::Add => DrawMode::Cut,
                 DrawMode::Cut => DrawMode::Add,
@@ -173,10 +182,14 @@ fn draw_brush_activate(
         return;
     }
 
-    // B or Mouse4 = draw in Add mode, C = draw in Cut mode
-    let mode = if keyboard.just_pressed(KeyCode::KeyB) || mouse.just_pressed(MouseButton::Back) {
+    // B or Mouse4 = draw in Add mode, Alt+B = append to brush, C = draw in Cut mode
+    let append = keybinds.just_pressed(EditorAction::AppendToBrush, &keyboard);
+    let mode = if keybinds.just_pressed(EditorAction::DrawAdd, &keyboard)
+        || append
+        || mouse.just_pressed(MouseButton::Back)
+    {
         DrawMode::Add
-    } else if keyboard.just_pressed(KeyCode::KeyC) {
+    } else if keybinds.just_pressed(EditorAction::DrawCut, &keyboard) {
         DrawMode::Cut
     } else {
         return;
@@ -186,14 +199,9 @@ fn draw_brush_activate(
         return;
     }
 
-    // Only append to selected brush when Alt is held; otherwise always create new
-    let append_target = if mode == DrawMode::Add {
-        let alt = keyboard.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
-        if alt {
-            selection.primary().filter(|&e| brush_query.contains(e))
-        } else {
-            None
-        }
+    // Only append to selected brush when AppendToBrush matched; otherwise always create new
+    let append_target = if mode == DrawMode::Add && append {
+        selection.primary().filter(|&e| brush_query.contains(e))
     } else {
         None
     };
@@ -527,18 +535,21 @@ fn draw_brush_confirm(
 fn draw_brush_cancel(
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     mut draw_state: ResMut<DrawBrushState>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
     viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
 ) {
+    use crate::keybinds::EditorAction;
+
     let Some(ref mut active) = draw_state.active else {
         return;
     };
 
     // Polygon mode: Enter closes polygon (via convex hull), Backspace removes last vertex
     if active.phase == DrawPhase::DrawingPolygon {
-        if keyboard.just_pressed(KeyCode::Enter) {
+        if keybinds.just_pressed(EditorAction::ClosePolygon, &keyboard) {
             let hull = convex_hull_on_plane(&active.polygon_vertices, &active.plane);
             if hull.len() >= 3 {
                 active.polygon_vertices = hull;
@@ -554,7 +565,7 @@ fn draw_brush_cancel(
                 return;
             }
         }
-        if keyboard.just_pressed(KeyCode::Backspace) {
+        if keybinds.just_pressed(EditorAction::RemoveLastVertex, &keyboard) {
             active.polygon_vertices.pop();
             if active.polygon_vertices.is_empty() {
                 active.phase = DrawPhase::PlacingFirstCorner;
@@ -563,7 +574,9 @@ fn draw_brush_cancel(
         }
     }
 
-    if keyboard.just_pressed(KeyCode::Escape) || mouse.just_pressed(MouseButton::Right) {
+    if keybinds.just_pressed(EditorAction::CancelDraw, &keyboard)
+        || mouse.just_pressed(MouseButton::Right)
+    {
         draw_state.active = None;
     }
 }
@@ -1825,12 +1838,15 @@ impl EditorCommand for SubtractBrushCommand {
 
 fn join_selected_brushes(
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     input_focus: Res<InputFocus>,
     modal: Res<crate::modal_transform::ModalTransformState>,
     draw_state: Res<DrawBrushState>,
     mut commands: Commands,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyJ) {
+    use crate::keybinds::EditorAction;
+
+    if !keybinds.just_pressed(EditorAction::JoinBrushes, &keyboard) {
         return;
     }
     if input_focus.0.is_some() || modal.active.is_some() || draw_state.active.is_some() {
@@ -2054,19 +2070,15 @@ pub fn join_selected_brushes_impl(world: &mut World) {
 
 fn csg_subtract_selected(
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     input_focus: Res<InputFocus>,
     modal: Res<crate::modal_transform::ModalTransformState>,
     draw_state: Res<DrawBrushState>,
     mut commands: Commands,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyK) {
-        return;
-    }
-    if !keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]) {
-        return;
-    }
-    // Ctrl+Shift+K is intersect, not subtract
-    if keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
+    use crate::keybinds::EditorAction;
+
+    if !keybinds.just_pressed(EditorAction::CsgSubtract, &keyboard) {
         return;
     }
     if input_focus.0.is_some() || modal.active.is_some() || draw_state.active.is_some() {
@@ -2256,18 +2268,15 @@ pub fn csg_subtract_selected_impl(world: &mut World) {
 
 fn csg_intersect_selected(
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     input_focus: Res<InputFocus>,
     modal: Res<crate::modal_transform::ModalTransformState>,
     draw_state: Res<DrawBrushState>,
     mut commands: Commands,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyK) {
-        return;
-    }
-    if !keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]) {
-        return;
-    }
-    if !keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
+    use crate::keybinds::EditorAction;
+
+    if !keybinds.just_pressed(EditorAction::CsgIntersect, &keyboard) {
         return;
     }
     if input_focus.0.is_some() || modal.active.is_some() || draw_state.active.is_some() {
@@ -2396,6 +2405,7 @@ pub fn csg_intersect_selected_impl(world: &mut World) {
 
 fn extend_face_to_brush(
     keyboard: Res<ButtonInput<KeyCode>>,
+    keybinds: Res<crate::keybinds::KeybindRegistry>,
     input_focus: Res<InputFocus>,
     modal: Res<crate::modal_transform::ModalTransformState>,
     draw_state: Res<DrawBrushState>,
@@ -2410,10 +2420,9 @@ fn extend_face_to_brush(
     brush_query: Query<(), With<Brush>>,
     mut commands: Commands,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyE) {
-        return;
-    }
-    if !keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]) {
+    use crate::keybinds::EditorAction;
+
+    if !keybinds.just_pressed(EditorAction::ExtendFaceToBrush, &keyboard) {
         return;
     }
     if input_focus.0.is_some() || modal.active.is_some() || draw_state.active.is_some() {

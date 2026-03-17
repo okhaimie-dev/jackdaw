@@ -11,6 +11,8 @@ pub mod face_grid;
 pub mod gizmos;
 pub mod hierarchy;
 pub mod inspector;
+pub mod keybind_settings;
+pub mod keybinds;
 pub use inspector::{EditorMeta, ReflectEditorMeta};
 pub mod layout;
 pub mod material_browser;
@@ -42,8 +44,19 @@ use bevy::{
     prelude::*,
 };
 use jackdaw_feathers::EditorFeathersPlugin;
+use jackdaw_feathers::dialog::EditorDialog;
 use jackdaw_widgets::menu_bar::MenuAction;
 use selection::Selection;
+
+/// System set for all editor interaction systems (input handling, viewport clicks,
+/// gizmo drags, etc.). Automatically disabled when any dialog is open.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EditorInteraction;
+
+/// Run condition: returns `true` when no `EditorDialog` entity exists.
+pub fn no_dialog_open(dialogs: Query<(), With<EditorDialog>>) -> bool {
+    dialogs.is_empty()
+}
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum AppState {
@@ -97,6 +110,8 @@ impl Plugin for EditorPlugin {
                 viewport_select::ViewportSelectPlugin,
                 snapping::SnappingPlugin,
             ))
+            .add_plugins(keybinds::KeybindsPlugin)
+            .add_plugins(keybind_settings::KeybindSettingsPlugin)
             .add_plugins((
                 viewport_overlays::ViewportOverlaysPlugin,
                 view_modes::ViewModesPlugin,
@@ -114,6 +129,12 @@ impl Plugin for EditorPlugin {
                 prefab_picker::PrefabPickerPlugin,
                 remote::RemoteConnectionPlugin,
             ))
+            .configure_sets(
+                Update,
+                EditorInteraction
+                    .run_if(in_state(AppState::Editor))
+                    .run_if(no_dialog_open),
+            )
             .insert_resource(UiTheme(create_dark_theme()))
             .init_resource::<layout::ActiveWorkspace>()
             .init_resource::<layout::KeybindHelpPopover>()
@@ -206,6 +227,8 @@ fn populate_menu(world: &mut World) {
                     ("file.save_as", "Save As..."),
                     ("---", ""),
                     ("file.save_template", "Save Selection as Template"),
+                    ("---", ""),
+                    ("file.keybinds", "Keybinds..."),
                 ],
             ),
             (
@@ -383,6 +406,9 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
                     bs.temporary_mode = false;
                 }
             });
+        }
+        "file.keybinds" => {
+            commands.trigger(keybind_settings::OpenKeybindSettingsEvent);
         }
         "view.wireframe" => {
             commands.queue(|world: &mut World| {

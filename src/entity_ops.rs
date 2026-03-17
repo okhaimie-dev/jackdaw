@@ -34,7 +34,7 @@ impl Plugin for EntityOpsPlugin {
         // Note: GltfSource type registration is handled by JsnPlugin
         app.init_resource::<ComponentClipboard>().add_systems(
             Update,
-            handle_entity_keys.run_if(in_state(crate::AppState::Editor)),
+            handle_entity_keys.in_set(crate::EditorInteraction),
         );
     }
 }
@@ -377,77 +377,88 @@ fn handle_entity_keys(world: &mut World) {
         return;
     }
 
+    use crate::keybinds::EditorAction;
+
     let keyboard = world.resource::<ButtonInput<KeyCode>>();
+    let keybinds = world.resource::<crate::keybinds::KeybindRegistry>();
+
+    let delete = keybinds.just_pressed(EditorAction::Delete, keyboard);
+    let duplicate = keybinds.just_pressed(EditorAction::Duplicate, keyboard);
+    let copy = keybinds.just_pressed(EditorAction::CopyComponents, keyboard);
+    let paste = keybinds.just_pressed(EditorAction::PasteComponents, keyboard);
+    let reset_pos = keybinds.just_pressed(EditorAction::ResetPosition, keyboard);
+    let reset_rot = keybinds.just_pressed(EditorAction::ResetRotation, keyboard);
+    let reset_scale = keybinds.just_pressed(EditorAction::ResetScale, keyboard);
+    let toggle_vis = keybinds.just_pressed(EditorAction::ToggleVisibility, keyboard);
+
+    // Rotations (Alt+Arrow/PageUp/Down)
+    let rot_left = keybinds.just_pressed(EditorAction::Rotate90Left, keyboard);
+    let rot_right = keybinds.just_pressed(EditorAction::Rotate90Right, keyboard);
+    let rot_up = keybinds.just_pressed(EditorAction::Rotate90Up, keyboard);
+    let rot_down = keybinds.just_pressed(EditorAction::Rotate90Down, keyboard);
+    let roll_left = keybinds.just_pressed(EditorAction::Roll90Left, keyboard);
+    let roll_right = keybinds.just_pressed(EditorAction::Roll90Right, keyboard);
+    let any_rotation = rot_left || rot_right || rot_up || rot_down || roll_left || roll_right;
+
+    // Nudge — use key_just_pressed since Ctrl+arrow is also valid (duplicate+nudge)
     let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     let alt = keyboard.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
-    let delete_pressed = keyboard.just_pressed(KeyCode::Delete);
-    let d_pressed = keyboard.just_pressed(KeyCode::KeyD);
-    let g_pressed = keyboard.just_pressed(KeyCode::KeyG);
-    let r_pressed = keyboard.just_pressed(KeyCode::KeyR);
-    let s_pressed = keyboard.just_pressed(KeyCode::KeyS);
-    let h_pressed = keyboard.just_pressed(KeyCode::KeyH);
-    let c_pressed = keyboard.just_pressed(KeyCode::KeyC);
-    let v_pressed = keyboard.just_pressed(KeyCode::KeyV);
+    let nudge_left = keybinds.key_just_pressed(EditorAction::NudgeLeft, keyboard) && !alt;
+    let nudge_right = keybinds.key_just_pressed(EditorAction::NudgeRight, keyboard) && !alt;
+    let nudge_fwd = keybinds.key_just_pressed(EditorAction::NudgeForward, keyboard) && !alt;
+    let nudge_back = keybinds.key_just_pressed(EditorAction::NudgeBack, keyboard) && !alt;
+    let nudge_up = keybinds.key_just_pressed(EditorAction::NudgeUp, keyboard) && !alt;
+    let nudge_down = keybinds.key_just_pressed(EditorAction::NudgeDown, keyboard) && !alt;
+    let any_nudge = nudge_left || nudge_right || nudge_fwd || nudge_back || nudge_up || nudge_down;
 
-    // Arrow key / PageUp/Down presses
-    let left = keyboard.just_pressed(KeyCode::ArrowLeft);
-    let right = keyboard.just_pressed(KeyCode::ArrowRight);
-    let up = keyboard.just_pressed(KeyCode::ArrowUp);
-    let down = keyboard.just_pressed(KeyCode::ArrowDown);
-    let page_up = keyboard.just_pressed(KeyCode::PageUp);
-    let page_down = keyboard.just_pressed(KeyCode::PageDown);
-    let arrow_pressed = left || right || up || down || page_up || page_down;
-
-    if delete_pressed {
+    if delete {
         delete_selected(world);
-    } else if ctrl && d_pressed {
+    } else if duplicate {
         duplicate_selected(world);
-    } else if ctrl && c_pressed {
+    } else if copy {
         copy_components(world);
-    } else if ctrl && v_pressed {
+    } else if paste {
         paste_components(world);
-    } else if alt && g_pressed {
+    } else if reset_pos {
         reset_transform_selected(world, TransformReset::Position);
-    } else if alt && r_pressed {
+    } else if reset_rot {
         reset_transform_selected(world, TransformReset::Rotation);
-    } else if alt && s_pressed {
+    } else if reset_scale {
         reset_transform_selected(world, TransformReset::Scale);
-    } else if h_pressed && !ctrl && !alt {
+    } else if toggle_vis {
         toggle_visibility_selected(world);
-    } else if alt && arrow_pressed {
-        // Alt+Arrow/PageUp/PageDown: 90-degree rotation
-        let rotation = if left {
+    } else if any_rotation {
+        let rotation = if rot_left {
             Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2)
-        } else if right {
+        } else if rot_right {
             Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)
-        } else if up {
+        } else if rot_up {
             Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)
-        } else if down {
+        } else if rot_down {
             Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)
-        } else if page_up {
+        } else if roll_left {
             Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
         } else {
-            // page_down
+            // roll_right
             Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)
         };
         rotate_selected(world, rotation);
-    } else if arrow_pressed && !alt {
-        // Arrow keys: grid-unit movement
+    } else if any_nudge {
         let grid_size = world
             .resource::<crate::snapping::SnapSettings>()
             .grid_size();
-        let offset = if left {
+        let offset = if nudge_left {
             Vec3::new(-grid_size, 0.0, 0.0)
-        } else if right {
+        } else if nudge_right {
             Vec3::new(grid_size, 0.0, 0.0)
-        } else if up {
+        } else if nudge_fwd {
             Vec3::new(0.0, 0.0, -grid_size)
-        } else if down {
+        } else if nudge_back {
             Vec3::new(0.0, 0.0, grid_size)
-        } else if page_up {
+        } else if nudge_up {
             Vec3::new(0.0, grid_size, 0.0)
         } else {
-            // page_down
+            // nudge_down
             Vec3::new(0.0, -grid_size, 0.0)
         };
 

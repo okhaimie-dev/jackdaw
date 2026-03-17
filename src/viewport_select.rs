@@ -18,7 +18,7 @@ impl Plugin for ViewportSelectPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<BoxSelectState>().add_systems(
             Update,
-            (handle_viewport_click, handle_box_select).run_if(in_state(crate::AppState::Editor)),
+            (handle_viewport_click, handle_box_select).in_set(crate::EditorInteraction),
         );
     }
 }

@@ -548,7 +548,8 @@ fn toolbar_help_button(icon_font: Handle<Font>) -> impl Bundle {
         observe(
             |trigger: On<Pointer<Click>>,
              mut commands: Commands,
-             mut popover_state: ResMut<KeybindHelpPopover>| {
+             mut popover_state: ResMut<KeybindHelpPopover>,
+             registry: Res<crate::keybinds::KeybindRegistry>| {
                 // Toggle: if popover exists, despawn it
                 if let Some(entity) = popover_state.entity.take() {
                     if let Ok(mut ec) = commands.get_entity(entity) {
@@ -575,7 +576,7 @@ fn toolbar_help_button(icon_font: Handle<Font>) -> impl Bundle {
                                 ..Default::default()
                             })
                             .with_children(|scroll_parent| {
-                                spawn_keybind_help_content(scroll_parent);
+                                spawn_keybind_help_content(scroll_parent, &registry);
                             });
                     })
                     .id();
@@ -586,20 +587,21 @@ fn toolbar_help_button(icon_font: Handle<Font>) -> impl Bundle {
     )
 }
 
-fn spawn_keybind_help_content(parent: &mut ChildSpawnerCommands) {
-    let sections: &[(&str, &[(&str, &str)])] = &[
+fn spawn_keybind_help_content(
+    parent: &mut ChildSpawnerCommands,
+    registry: &crate::keybinds::KeybindRegistry,
+) {
+    use jackdaw_commands::keybinds::EditorAction;
+
+    // Mouse-only entries that can't be expressed as keybinds, grouped by category
+    let mouse_entries: &[(&str, &[(&str, &str)])] = &[
         (
             "Navigation",
             &[
                 ("RMB + Drag", "Look around"),
-                ("W/A/S/D", "Move"),
-                ("Q/E", "Up / Down"),
                 ("Shift", "Double speed"),
                 ("Scroll", "Dolly forward/back"),
                 ("RMB + Scroll", "Adjust move speed"),
-                ("F", "Focus selected"),
-                ("Ctrl+1-9", "Save camera bookmark"),
-                ("1-9", "Restore bookmark"),
             ],
         ),
         (
@@ -613,89 +615,92 @@ fn spawn_keybind_help_content(parent: &mut ChildSpawnerCommands) {
         (
             "Transform",
             &[
-                ("Esc", "Translate mode"),
-                ("R", "Rotate mode"),
-                ("T", "Scale mode"),
-                ("X", "Toggle local/world"),
                 ("MMB", "Toggle snap"),
                 ("Ctrl", "Toggle snap (during drag)"),
-                ("Arrows", "Nudge (grid-unit)"),
-                ("Alt+Arrows", "90° rotate"),
-                ("PgUp / PgDn", "Nudge vertical"),
-            ],
-        ),
-        (
-            "Entity",
-            &[
-                ("Delete", "Delete"),
-                ("Ctrl+D", "Duplicate"),
-                ("Ctrl+C / Ctrl+V", "Copy / Paste components"),
-                ("H", "Toggle visibility"),
-                ("Alt+G", "Reset position"),
-                ("Alt+R", "Reset rotation"),
-                ("Alt+S", "Reset scale"),
             ],
         ),
         (
             "Brush Edit",
             &[
-                ("1", "Vertex mode (toggle)"),
-                ("2", "Edge mode (toggle)"),
-                ("3", "Face mode (toggle)"),
-                ("4", "Clip mode (toggle)"),
                 ("Shift+Click", "Multi-select"),
                 ("Click+Drag", "Move selected"),
-                ("X/Y/Z", "Constrain axis (during drag)"),
-                ("Delete", "Delete selected"),
-                ("Enter", "Apply clip"),
-                ("Esc", "Exit edit / Cancel drag"),
             ],
         ),
         (
-            "CSG",
+            "Draw Brush",
             &[
-                ("J", "Join (convex merge)"),
-                ("Ctrl+K", "CSG Subtract"),
-                ("Ctrl+Shift+K", "CSG Intersect"),
-                ("Ctrl+E", "Extend face to brush"),
-            ],
-        ),
-        (
-            "Brush Draw",
-            &[
-                ("B", "Draw brush (add)"),
-                ("C", "Draw brush (cut)"),
-                ("Tab", "Toggle Add/Cut"),
                 ("Click", "Place vertex / advance"),
-                ("Enter", "Close polygon"),
-                ("Backspace", "Remove last vertex"),
-                ("Esc / Right-click", "Cancel"),
+                ("Right-click", "Cancel"),
             ],
         ),
-        (
-            "View",
-            &[
-                ("Ctrl+Shift+W", "Toggle wireframe"),
-                ("[  /  ]", "Grid size down/up"),
-                ("Ctrl+Alt+Scroll", "Grid size"),
-            ],
-        ),
-        (
-            "File",
-            &[
-                ("Ctrl+S", "Save scene"),
-                ("Ctrl+O", "Open scene"),
-                ("Ctrl+Shift+N", "New scene"),
-                ("Ctrl+Z", "Undo"),
-                ("Ctrl+Shift+Z", "Redo"),
-            ],
-        ),
+        ("View", &[("Ctrl+Alt+Scroll", "Grid size")]),
     ];
 
-    for (section_title, bindings) in sections {
+    // Build sections dynamically from registry
+    let category_order = [
+        "File",
+        "Entity",
+        "Transform",
+        "Brush Edit",
+        "Draw Brush",
+        "CSG",
+        "Gizmo",
+        "Navigation",
+        "View",
+    ];
+
+    // Also include Selection between Navigation and View
+    let display_order = [
+        "Navigation",
+        "Selection",
+        "Transform",
+        "Entity",
+        "Brush Edit",
+        "CSG",
+        "Draw Brush",
+        "Gizmo",
+        "View",
+        "File",
+    ];
+
+    for &section in &display_order {
+        let mut entries: Vec<(String, String)> = Vec::new();
+
+        // Add mouse entries for this section
+        for (cat, mouse_binds) in mouse_entries {
+            if *cat == section {
+                for (key, desc) in *mouse_binds {
+                    entries.push((key.to_string(), desc.to_string()));
+                }
+            }
+        }
+
+        // Add keybind entries for this section (if it's a real category)
+        if category_order.contains(&section) {
+            for &action in EditorAction::all() {
+                if action.category() != section {
+                    continue;
+                }
+                let bindings = registry.bindings.get(&action).cloned().unwrap_or_default();
+                if bindings.is_empty() {
+                    continue;
+                }
+                let key_str = bindings
+                    .iter()
+                    .map(|b| b.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" / ");
+                entries.push((key_str, action.to_string()));
+            }
+        }
+
+        if entries.is_empty() {
+            continue;
+        }
+
         // Section header
         parent.spawn((
-            Text::new(*section_title),
+            Text::new(section),
             TextFont {
                 font_size: tokens::FONT_SM,
                 ..Default::default()
@@ -707,7 +712,7 @@ fn spawn_keybind_help_content(parent: &mut ChildSpawnerCommands) {
             },
         ));
 
-        for (key, desc) in *bindings {
+        for (key, desc) in &entries {
             parent.spawn((
                 Node {
                     flex_direction: FlexDirection::Row,
@@ -718,7 +723,7 @@ fn spawn_keybind_help_content(parent: &mut ChildSpawnerCommands) {
                 },
                 children![
                     (
-                        Text::new(*key),
+                        Text::new(key.clone()),
                         TextFont {
                             font_size: tokens::FONT_SM,
                             ..Default::default()
@@ -726,7 +731,7 @@ fn spawn_keybind_help_content(parent: &mut ChildSpawnerCommands) {
                         TextColor(tokens::TEXT_PRIMARY),
                     ),
                     (
-                        Text::new(*desc),
+                        Text::new(desc.clone()),
                         TextFont {
                             font_size: tokens::FONT_SM,
                             ..Default::default()

@@ -132,14 +132,21 @@ impl Plugin for BrushPlugin {
                 Update,
                 (
                     interaction::handle_edit_mode_keys,
-                    mesh::sync_brush_preview,
-                    mesh::regenerate_brush_meshes,
-                    mesh::apply_brush_preview_materials,
                     interaction::brush_face_interact,
                     interaction::brush_vertex_interact,
                     interaction::brush_edge_interact,
                     interaction::handle_brush_delete,
                     interaction::handle_clip_mode,
+                )
+                    .chain()
+                    .in_set(crate::EditorInteraction),
+            )
+            .add_systems(
+                Update,
+                (
+                    mesh::sync_brush_preview,
+                    mesh::regenerate_brush_meshes,
+                    mesh::apply_brush_preview_materials,
                     gizmo_overlay::draw_brush_edit_gizmos,
                 )
                     .chain()

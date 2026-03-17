@@ -1,3 +1,5 @@
+pub mod keybinds;
+
 use bevy::prelude::*;
 
 pub trait EditorCommand: Send + Sync + 'static {

@@ -59,10 +59,15 @@ pub struct SceneIoPlugin;
 
 impl Plugin for SceneIoPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<SceneFilePath>().add_systems(
-            Update,
-            (handle_scene_io_keys, poll_scene_dialog).run_if(in_state(crate::AppState::Editor)),
-        );
+        app.init_resource::<SceneFilePath>()
+            .add_systems(
+                Update,
+                handle_scene_io_keys.in_set(crate::EditorInteraction),
+            )
+            .add_systems(
+                Update,
+                poll_scene_dialog.run_if(in_state(crate::AppState::Editor)),
+            );
     }
 }
 
@@ -1650,20 +1655,22 @@ fn poll_scene_dialog(world: &mut World) {
 }
 
 fn handle_scene_io_keys(world: &mut World) {
-    let keyboard = world.resource::<ButtonInput<KeyCode>>();
-    let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
-    let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
-    let s_pressed = keyboard.just_pressed(KeyCode::KeyS);
-    let o_pressed = keyboard.just_pressed(KeyCode::KeyO);
-    let n_pressed = keyboard.just_pressed(KeyCode::KeyN);
+    use crate::keybinds::EditorAction;
 
-    if ctrl && shift && s_pressed {
+    let keyboard = world.resource::<ButtonInput<KeyCode>>();
+    let keybinds = world.resource::<crate::keybinds::KeybindRegistry>();
+    let save_as = keybinds.just_pressed(EditorAction::SaveAs, keyboard);
+    let save = keybinds.just_pressed(EditorAction::Save, keyboard);
+    let open = keybinds.just_pressed(EditorAction::Open, keyboard);
+    let new = keybinds.just_pressed(EditorAction::NewScene, keyboard);
+
+    if save_as {
         save_scene_as(world);
-    } else if ctrl && s_pressed {
+    } else if save {
         save_scene(world);
-    } else if ctrl && o_pressed {
+    } else if open {
         load_scene(world);
-    } else if ctrl && shift && n_pressed {
+    } else if new {
         new_scene(world);
     }
 }

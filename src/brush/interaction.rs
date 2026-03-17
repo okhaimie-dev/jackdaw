@@ -1,10 +1,11 @@
 use std::collections::HashSet;
 
-use bevy::{input_focus::InputFocus, prelude::*};
+use bevy::{ecs::system::SystemParam, input_focus::InputFocus, prelude::*};
 
 use crate::{
     commands::{CommandHistory, snapshot_entity},
     draw_brush::CreateBrushCommand,
+    keybinds::{EditorAction, KeybindRegistry},
     selection::{Selected, Selection},
     viewport::{MainViewportCamera, SceneViewport},
     viewport_util::{point_in_polygon_2d, point_to_segment_dist, window_to_viewport_cursor},
@@ -20,9 +21,16 @@ use jackdaw_geometry::{
 };
 use jackdaw_jsn::{Brush, BrushFaceData, BrushPlane};
 
+/// Bundled keyboard + keybind input to keep system parameter counts under the 16-param limit.
+#[derive(SystemParam)]
+pub(super) struct KeyboardInput<'w> {
+    pub keyboard: Res<'w, ButtonInput<KeyCode>>,
+    pub keybinds: Res<'w, KeybindRegistry>,
+}
+
 pub(super) fn handle_edit_mode_keys(
     input_focus: Res<InputFocus>,
-    keyboard: Res<ButtonInput<KeyCode>>,
+    input: KeyboardInput,
     selection: Res<Selection>,
     mut edit_mode: ResMut<EditMode>,
     mut brush_selection: ResMut<BrushSelection>,
@@ -33,6 +41,8 @@ pub(super) fn handle_edit_mode_keys(
     edge_drag: Res<EdgeDragState>,
     clip_state: Res<ClipState>,
 ) {
+    let keyboard = &input.keyboard;
+    let keybinds = &input.keybinds;
     if input_focus.0.is_some() || modal.active.is_some() {
         return;
     }
@@ -63,56 +73,52 @@ pub(super) fn handle_edit_mode_keys(
         return;
     }
 
-    let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
+    // 1/2/3/4 toggle brush sub-element modes
+    let pressed_mode = if keybinds.just_pressed(EditorAction::VertexMode, keyboard) {
+        Some(BrushEditMode::Vertex)
+    } else if keybinds.just_pressed(EditorAction::EdgeMode, keyboard) {
+        Some(BrushEditMode::Edge)
+    } else if keybinds.just_pressed(EditorAction::FaceMode, keyboard) {
+        Some(BrushEditMode::Face)
+    } else if keybinds.just_pressed(EditorAction::ClipMode, keyboard) {
+        Some(BrushEditMode::Clip)
+    } else {
+        None
+    };
 
-    // 1/2/3/4 toggle brush sub-element modes (skip if Ctrl held for bookmark save)
-    if !ctrl {
-        let pressed_mode = if keyboard.just_pressed(KeyCode::Digit1) {
-            Some(BrushEditMode::Vertex)
-        } else if keyboard.just_pressed(KeyCode::Digit2) {
-            Some(BrushEditMode::Edge)
-        } else if keyboard.just_pressed(KeyCode::Digit3) {
-            Some(BrushEditMode::Face)
-        } else if keyboard.just_pressed(KeyCode::Digit4) {
-            Some(BrushEditMode::Clip)
-        } else {
-            None
-        };
-
-        if let Some(target_mode) = pressed_mode {
-            if let EditMode::BrushEdit(current) = *edit_mode {
-                if current == target_mode {
-                    // Same key again: toggle off to Object
-                    *edit_mode = EditMode::Object;
-                    brush_selection.entity = None;
-                    brush_selection.faces.clear();
-                    brush_selection.vertices.clear();
-                    brush_selection.edges.clear();
-                } else {
-                    // Switch sub-mode, clear sub-element selections
-                    *edit_mode = EditMode::BrushEdit(target_mode);
-                    brush_selection.faces.clear();
-                    brush_selection.vertices.clear();
-                    brush_selection.edges.clear();
-                    brush_selection.temporary_mode = false;
-                }
+    if let Some(target_mode) = pressed_mode {
+        if let EditMode::BrushEdit(current) = *edit_mode {
+            if current == target_mode {
+                // Same key again: toggle off to Object
+                *edit_mode = EditMode::Object;
+                brush_selection.entity = None;
+                brush_selection.faces.clear();
+                brush_selection.vertices.clear();
+                brush_selection.edges.clear();
             } else {
-                // From Object mode: enter edit on primary if it's a brush
-                if let Some(entity) = selection.primary().filter(|&e| brushes.contains(e)) {
-                    *edit_mode = EditMode::BrushEdit(target_mode);
-                    brush_selection.entity = Some(entity);
-                    brush_selection.faces.clear();
-                    brush_selection.vertices.clear();
-                    brush_selection.edges.clear();
-                    brush_selection.temporary_mode = false;
-                }
+                // Switch sub-mode, clear sub-element selections
+                *edit_mode = EditMode::BrushEdit(target_mode);
+                brush_selection.faces.clear();
+                brush_selection.vertices.clear();
+                brush_selection.edges.clear();
+                brush_selection.temporary_mode = false;
             }
-            return;
+        } else {
+            // From Object mode: enter edit on primary if it's a brush
+            if let Some(entity) = selection.primary().filter(|&e| brushes.contains(e)) {
+                *edit_mode = EditMode::BrushEdit(target_mode);
+                brush_selection.entity = Some(entity);
+                brush_selection.faces.clear();
+                brush_selection.vertices.clear();
+                brush_selection.edges.clear();
+                brush_selection.temporary_mode = false;
+            }
         }
+        return;
     }
 
     // Escape: exit to Object (unless Clip mode with pending points)
-    if keyboard.just_pressed(KeyCode::Escape) {
+    if keybinds.just_pressed(EditorAction::ExitEditMode, keyboard) {
         if let EditMode::BrushEdit(BrushEditMode::Clip) = *edit_mode {
             if !clip_state.points.is_empty() {
                 // Let clip mode's own Escape handler clear the points first
@@ -132,7 +138,7 @@ pub(super) fn handle_edit_mode_keys(
 pub(super) fn brush_face_interact(
     mut edit_mode: ResMut<EditMode>,
     mouse: Res<ButtonInput<MouseButton>>,
-    keyboard: Res<ButtonInput<KeyCode>>,
+    input: KeyboardInput,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
     viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
@@ -147,6 +153,8 @@ pub(super) fn brush_face_interact(
     mut commands: Commands,
     snap_settings: Res<crate::snapping::SnapSettings>,
 ) {
+    let keyboard = &input.keyboard;
+    let keybinds = &input.keybinds;
     let in_face_edit = matches!(*edit_mode, EditMode::BrushEdit(BrushEditMode::Face));
 
     // PageUp/PageDown: nudge selected face vertices vertically (gabling)
@@ -157,9 +165,9 @@ pub(super) fn brush_face_interact(
         && !brush_selection.faces.is_empty()
     {
         if let Some(brush_entity) = brush_selection.entity {
-            let nudge_dir = if keyboard.just_pressed(KeyCode::PageUp) {
+            let nudge_dir = if keybinds.key_just_pressed(EditorAction::NudgeUp, keyboard) {
                 Some(1.0)
-            } else if keyboard.just_pressed(KeyCode::PageDown) {
+            } else if keybinds.key_just_pressed(EditorAction::NudgeDown, keyboard) {
                 Some(-1.0)
             } else {
                 None
@@ -261,7 +269,9 @@ pub(super) fn brush_face_interact(
 
     // Cancel active drag on Escape or right-click
     if drag_state.active {
-        if keyboard.just_pressed(KeyCode::Escape) || mouse.just_pressed(MouseButton::Right) {
+        if keybinds.just_pressed(EditorAction::ExitEditMode, keyboard)
+            || mouse.just_pressed(MouseButton::Right)
+        {
             match drag_state.extrude_mode {
                 FaceExtrudeMode::Merge => {
                     // Revert brush to start state
@@ -644,7 +654,7 @@ fn spawn_extruded_brush(
 pub(super) fn brush_vertex_interact(
     edit_mode: Res<EditMode>,
     mouse: Res<ButtonInput<MouseButton>>,
-    keyboard: Res<ButtonInput<KeyCode>>,
+    input: KeyboardInput,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
     viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
@@ -657,6 +667,8 @@ pub(super) fn brush_vertex_interact(
     mut history: ResMut<CommandHistory>,
     snap_settings: Res<crate::snapping::SnapSettings>,
 ) {
+    let keyboard = &input.keyboard;
+    let keybinds = &input.keybinds;
     let EditMode::BrushEdit(BrushEditMode::Vertex) = *edit_mode else {
         drag_state.active = false;
         drag_state.pending = None;
@@ -672,9 +684,9 @@ pub(super) fn brush_vertex_interact(
 
     // PageUp/PageDown: nudge selected vertices vertically (no cursor needed)
     if !drag_state.active && drag_state.pending.is_none() && !brush_selection.vertices.is_empty() {
-        let nudge_dir = if keyboard.just_pressed(KeyCode::PageUp) {
+        let nudge_dir = if keybinds.key_just_pressed(EditorAction::NudgeUp, keyboard) {
             Some(1.0)
-        } else if keyboard.just_pressed(KeyCode::PageDown) {
+        } else if keybinds.key_just_pressed(EditorAction::NudgeDown, keyboard) {
             Some(-1.0)
         } else {
             None
@@ -729,19 +741,19 @@ pub(super) fn brush_vertex_interact(
 
     // Axis constraint toggle during active drag
     if drag_state.active {
-        if keyboard.just_pressed(KeyCode::KeyX) {
+        if keybinds.just_pressed(EditorAction::ConstrainX, keyboard) {
             drag_state.constraint = if drag_state.constraint == VertexDragConstraint::AxisX {
                 VertexDragConstraint::Free
             } else {
                 VertexDragConstraint::AxisX
             };
-        } else if keyboard.just_pressed(KeyCode::KeyY) {
+        } else if keybinds.just_pressed(EditorAction::ConstrainY, keyboard) {
             drag_state.constraint = if drag_state.constraint == VertexDragConstraint::AxisY {
                 VertexDragConstraint::Free
             } else {
                 VertexDragConstraint::AxisY
             };
-        } else if keyboard.just_pressed(KeyCode::KeyZ) {
+        } else if keybinds.just_pressed(EditorAction::ConstrainZ, keyboard) {
             drag_state.constraint = if drag_state.constraint == VertexDragConstraint::AxisZ {
                 VertexDragConstraint::Free
             } else {
@@ -752,7 +764,9 @@ pub(super) fn brush_vertex_interact(
 
     // Cancel active drag on Escape or right-click
     if drag_state.active {
-        if keyboard.just_pressed(KeyCode::Escape) || mouse.just_pressed(MouseButton::Right) {
+        if keybinds.just_pressed(EditorAction::ExitEditMode, keyboard)
+            || mouse.just_pressed(MouseButton::Right)
+        {
             if let Some(ref start) = drag_state.start_brush {
                 if let Ok(mut brush) = brushes.get_mut(brush_entity) {
                     *brush = start.clone();
@@ -986,7 +1000,7 @@ pub(super) fn brush_vertex_interact(
 pub(super) fn brush_edge_interact(
     edit_mode: Res<EditMode>,
     mouse: Res<ButtonInput<MouseButton>>,
-    keyboard: Res<ButtonInput<KeyCode>>,
+    input: KeyboardInput,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
     viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
@@ -999,6 +1013,8 @@ pub(super) fn brush_edge_interact(
     mut history: ResMut<CommandHistory>,
     snap_settings: Res<crate::snapping::SnapSettings>,
 ) {
+    let keyboard = &input.keyboard;
+    let keybinds = &input.keybinds;
     let EditMode::BrushEdit(BrushEditMode::Edge) = *edit_mode else {
         drag_state.active = false;
         drag_state.pending = None;
@@ -1014,9 +1030,9 @@ pub(super) fn brush_edge_interact(
 
     // PageUp/PageDown: nudge selected edge vertices vertically (no cursor needed)
     if !drag_state.active && drag_state.pending.is_none() && !brush_selection.edges.is_empty() {
-        let nudge_dir = if keyboard.just_pressed(KeyCode::PageUp) {
+        let nudge_dir = if keybinds.key_just_pressed(EditorAction::NudgeUp, keyboard) {
             Some(1.0)
-        } else if keyboard.just_pressed(KeyCode::PageDown) {
+        } else if keybinds.key_just_pressed(EditorAction::NudgeDown, keyboard) {
             Some(-1.0)
         } else {
             None
@@ -1075,19 +1091,19 @@ pub(super) fn brush_edge_interact(
 
     // Axis constraint toggle during active drag
     if drag_state.active {
-        if keyboard.just_pressed(KeyCode::KeyX) {
+        if keybinds.just_pressed(EditorAction::ConstrainX, keyboard) {
             drag_state.constraint = if drag_state.constraint == VertexDragConstraint::AxisX {
                 VertexDragConstraint::Free
             } else {
                 VertexDragConstraint::AxisX
             };
-        } else if keyboard.just_pressed(KeyCode::KeyY) {
+        } else if keybinds.just_pressed(EditorAction::ConstrainY, keyboard) {
             drag_state.constraint = if drag_state.constraint == VertexDragConstraint::AxisY {
                 VertexDragConstraint::Free
             } else {
                 VertexDragConstraint::AxisY
             };
-        } else if keyboard.just_pressed(KeyCode::KeyZ) {
+        } else if keybinds.just_pressed(EditorAction::ConstrainZ, keyboard) {
             drag_state.constraint = if drag_state.constraint == VertexDragConstraint::AxisZ {
                 VertexDragConstraint::Free
             } else {
@@ -1098,7 +1114,9 @@ pub(super) fn brush_edge_interact(
 
     // Cancel active drag on Escape or right-click
     if drag_state.active {
-        if keyboard.just_pressed(KeyCode::Escape) || mouse.just_pressed(MouseButton::Right) {
+        if keybinds.just_pressed(EditorAction::ExitEditMode, keyboard)
+            || mouse.just_pressed(MouseButton::Right)
+        {
             if let Some(ref start) = drag_state.start_brush {
                 if let Ok(mut brush) = brushes.get_mut(brush_entity) {
                     *brush = start.clone();
@@ -1388,7 +1406,7 @@ pub(crate) struct EdgeDragState {
 
 pub(super) fn handle_brush_delete(
     edit_mode: Res<EditMode>,
-    keyboard: Res<ButtonInput<KeyCode>>,
+    input: KeyboardInput,
     input_focus: Res<InputFocus>,
     mut brush_selection: ResMut<BrushSelection>,
     mut brushes: Query<&mut Brush>,
@@ -1398,13 +1416,16 @@ pub(super) fn handle_brush_delete(
     edge_drag: Res<EdgeDragState>,
     face_drag: Res<BrushDragState>,
 ) {
+    let keyboard = &input.keyboard;
+    let keybinds = &input.keybinds;
+
     let EditMode::BrushEdit(mode) = *edit_mode else {
         return;
     };
     if input_focus.0.is_some() {
         return;
     }
-    if !keyboard.just_pressed(KeyCode::Delete) && !keyboard.just_pressed(KeyCode::Backspace) {
+    if !keybinds.just_pressed(EditorAction::DeleteBrushElement, keyboard) {
         return;
     }
     // Don't delete while dragging
@@ -1541,7 +1562,7 @@ pub(crate) struct ClipState {
 
 pub(super) fn handle_clip_mode(
     edit_mode: Res<EditMode>,
-    keyboard: Res<ButtonInput<KeyCode>>,
+    input: KeyboardInput,
     mouse: Res<ButtonInput<MouseButton>>,
     input_focus: Res<InputFocus>,
     windows: Query<&Window>,
@@ -1557,6 +1578,8 @@ pub(super) fn handle_clip_mode(
     mut commands: Commands,
     mut gizmos: Gizmos,
 ) {
+    let keyboard = &input.keyboard;
+    let keybinds = &input.keybinds;
     let EditMode::BrushEdit(BrushEditMode::Clip) = *edit_mode else {
         // Clear clip state when not in clip mode
         if !clip_state.points.is_empty() || clip_state.mode != ClipMode::KeepFront {
@@ -1585,7 +1608,7 @@ pub(super) fn handle_clip_mode(
     };
 
     // Escape clears clip points and resets mode
-    if keyboard.just_pressed(KeyCode::Escape) {
+    if keybinds.just_pressed(EditorAction::ClipClear, keyboard) {
         clip_state.points.clear();
         clip_state.preview_plane = None;
         clip_state.mode = ClipMode::KeepFront;
@@ -1593,7 +1616,9 @@ pub(super) fn handle_clip_mode(
     }
 
     // Tab cycles clip mode when preview plane exists
-    if keyboard.just_pressed(KeyCode::Tab) && clip_state.preview_plane.is_some() {
+    if keybinds.just_pressed(EditorAction::ClipCycleMode, keyboard)
+        && clip_state.preview_plane.is_some()
+    {
         clip_state.mode = match clip_state.mode {
             ClipMode::KeepFront => ClipMode::KeepBack,
             ClipMode::KeepBack => ClipMode::Split,
@@ -1696,7 +1721,7 @@ pub(super) fn handle_clip_mode(
     };
 
     // Enter: apply clip plane based on mode
-    if keyboard.just_pressed(KeyCode::Enter) {
+    if keybinds.just_pressed(EditorAction::ClipApply, keyboard) {
         if let Some(ref plane) = clip_state.preview_plane {
             let Ok(mut brush) = brushes.get_mut(brush_entity) else {
                 return;
