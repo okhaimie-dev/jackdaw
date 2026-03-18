@@ -1,17 +1,18 @@
 # 🐦‍⬛ Jackdaw 🐦‍⬛
 
 A 3D editor built for and with [Bevy](https://bevyengine.org/).
+Very early in dev, expect bugs and changes!
 
 <img width="1917" height="1033" alt="image" src="https://github.com/user-attachments/assets/fa53542b-de0a-420b-bde0-bdcb180992a5" />
 
 ## Features
 
 - **Brush-based geometry** draw, edit, and CSG-combine convex brushes with vertex/edge/face/clip editing modes
-- **Material system** texture browser, material definitions with ORM auto-detection, per-face application
-- **Terrain** heightmap sculpting and texture painting
-- **Scene serialization** save/load scenes in the `.jsn` format with full asset references
+- **Material system** VERY wip - texture browser, material definitions with ORM auto-detection, per-face application
+- **Terrain** heightmap sculpting and texture painting, very WIP :)
+- **Scene serialization** save/load scenes in the `.jsn` format with full asset references. Ideally to be replaced with BSN once ready. 
 - **Transform tools** translate, rotate, scale with grid snapping and axis constraints
-- **Undo/redo** full command history
+- **Undo/redo** full command history - some bugs atm with this
 - **Extensible** register custom components, add inspector panels, integrate with your game
 
 ## Usage
