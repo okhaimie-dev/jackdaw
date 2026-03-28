@@ -8,7 +8,7 @@
 
 
 A 3D editor built for and with [Bevy](https://bevyengine.org/).
-Very early in dev, expect bugs and changes!
+Very early in dev, expect bugs and changes! A BSN-friendly branch exists on the bsn-editor branch (the flow is to read/write to the BSN AST and then sync to the ECS for rendering the UI and viewport)
 
 <img width="1917" height="1033" alt="image" src="https://github.com/user-attachments/assets/fa53542b-de0a-420b-bde0-bdcb180992a5" />
 
