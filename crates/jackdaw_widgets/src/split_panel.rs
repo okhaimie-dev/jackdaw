@@ -116,18 +116,23 @@ fn recalculate_group(
 fn on_handle_added(
     trigger: On<Add, PanelHandle>,
     handles: Query<&ChildOf, With<PanelHandle>>,
-    nodes: Query<&Node>,
+    nodes: Query<(&Children, &Node)>,
     mut commands: Commands,
 ) {
     let Ok(&ChildOf(parent)) = handles.get(trigger.entity) else {
         return;
     };
 
-    let Ok(node) = nodes.get(parent) else {
+    let Ok((children, node)) = nodes.get(parent) else {
         return;
     };
 
-    let cursor_icon = get_drag_icon(node.flex_direction);
+    let index = children
+        .iter()
+        .position(|e| e == trigger.entity)
+        .unwrap_or(0);
+
+    let cursor_icon = get_drag_icon(node.flex_direction, index, children.len());
 
     commands
         .entity(trigger.entity)
@@ -137,19 +142,25 @@ fn on_handle_added(
 fn on_handle_drag_start(
     trigger: On<Pointer<DragStart>>,
     handles: Query<&ChildOf, With<PanelHandle>>,
-    nodes: Query<&Node>,
+    nodes: Query<(&Children, &Node)>,
     mut override_cursor: ResMut<OverrideCursor>,
 ) {
     let Ok(&ChildOf(parent)) = handles.get(trigger.event_target()) else {
         return;
     };
 
-    let Ok(node) = nodes.get(parent) else {
+    let Ok((children, node)) = nodes.get(parent) else {
         return;
     };
 
-    let cursor_icon = get_drag_icon(node.flex_direction);
+    let index = children
+        .iter()
+        .position(|e| e == trigger.entity)
+        .unwrap_or(0);
 
+    let cursor_icon = get_drag_icon(node.flex_direction, index, children.len());
+
+    // This is a low priority override, so if anything else is overriding the cursor, we don't need to
     if override_cursor.is_none() {
         override_cursor.0 = Some(EntityCursor::System(cursor_icon));
     }
@@ -158,29 +169,39 @@ fn on_handle_drag_start(
 fn on_handle_drag_end(
     trigger: On<Pointer<DragEnd>>,
     handles: Query<&ChildOf, With<PanelHandle>>,
-    nodes: Query<&Node>,
+    nodes: Query<(&Children, &Node)>,
     mut override_cursor: ResMut<OverrideCursor>,
 ) {
     let Ok(&ChildOf(parent)) = handles.get(trigger.event_target()) else {
         return;
     };
 
-    let Ok(node) = nodes.get(parent) else {
+    let Ok((children, node)) = nodes.get(parent) else {
         return;
     };
 
-    let cursor_icon = get_drag_icon(node.flex_direction);
+    let index = children
+        .iter()
+        .position(|e| e == trigger.entity)
+        .unwrap_or(0);
+
+    let cursor_icon = get_drag_icon(node.flex_direction, index, children.len());
 
     if override_cursor.0 == Some(EntityCursor::System(cursor_icon)) {
         override_cursor.0 = None;
     }
 }
 
-fn get_drag_icon(direction: FlexDirection) -> SystemCursorIcon {
-    match direction {
-        FlexDirection::Row => SystemCursorIcon::EResize,
-        FlexDirection::RowReverse => SystemCursorIcon::WResize,
-        FlexDirection::Column => SystemCursorIcon::NResize,
-        FlexDirection::ColumnReverse => SystemCursorIcon::SResize,
+fn get_drag_icon(direction: FlexDirection, index: usize, count: usize) -> SystemCursorIcon {
+    let is_right_half = index > count / 2;
+    match (direction, is_right_half) {
+        (FlexDirection::Row, false) => SystemCursorIcon::EResize,
+        (FlexDirection::Row, true) => SystemCursorIcon::WResize,
+        (FlexDirection::RowReverse, false) => SystemCursorIcon::WResize,
+        (FlexDirection::RowReverse, true) => SystemCursorIcon::EResize,
+        (FlexDirection::Column, false) => SystemCursorIcon::NResize,
+        (FlexDirection::Column, true) => SystemCursorIcon::SResize,
+        (FlexDirection::ColumnReverse, false) => SystemCursorIcon::SResize,
+        (FlexDirection::ColumnReverse, true) => SystemCursorIcon::NResize,
     }
 }
