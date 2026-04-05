@@ -1,0 +1,2200 @@
+{
+  "jsn": {
+    "format_version": [
+      1,
+      0,
+      0
+    ],
+    "editor_version": "0.1.5",
+    "bevy_version": "0.18"
+  },
+  "metadata": {
+    "name": "Untitled",
+    "description": "",
+    "author": "",
+    "created": "2026-03-09T21:08:08Z",
+    "modified": "2026-03-09T21:08:08Z"
+  },
+  "assets": {
+    "textures": [],
+    "models": [
+      "C:\\Users\\phino\\RustProj\\jackdaw\\assets\\jan\\jan.gltf"
+    ]
+  },
+  "editor": null,
+  "scene": [
+    {
+      "name": "mixamorig:RightHandRing2",
+      "transform": {
+        "translation": [
+          0.03140068,
+          3.8464375,
+          0.0
+        ],
+        "rotation": [
+          0.112755485,
+          3.3391308e-7,
+          9.044944e-8,
+          0.9936228
+        ],
+        "scale": [
+          1.0,
+          1.0000001,
+          1.0
+        ]
+      },
+      "parent": 11,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "7ba0de4e-1ef4-5b9a-b54d-329c71c9385d"
+      }
+    },
+    {
+      "name": "mixamorig:RightHandRing4",
+      "transform": {
+        "translation": [
+          -0.023584962,
+          3.1383195,
+          0.0
+        ],
+        "rotation": [
+          3.0733645e-8,
+          -3.085006e-9,
+          2.7939677e-9,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 22,
+      "components": {
+        "bevy_animation::AnimationTargetId": "e46c90f4-8449-59af-8389-68dbbd670813",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:Spine",
+      "transform": {
+        "translation": [
+          1.8626451e-9,
+          9.100807,
+          -1.7171052
+        ],
+        "rotation": [
+          -0.09310682,
+          0.0,
+          0.0,
+          0.99565613
+        ],
+        "scale": [
+          1.0,
+          0.9999998,
+          0.99999994
+        ]
+      },
+      "parent": 47,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "e0671ae8-cf22-53f0-a0da-868301ed95ab"
+      }
+    },
+    {
+      "name": "mixamorig:RightToeBase",
+      "transform": {
+        "translation": [
+          0.0000027008355,
+          15.692376,
+          -8.940697e-7
+        ],
+        "rotation": [
+          0.29575115,
+          0.054234426,
+          -0.016820423,
+          0.9535759
+        ],
+        "scale": [
+          0.99999994,
+          0.99999994,
+          1.0000001
+        ]
+      },
+      "parent": 12,
+      "components": {
+        "bevy_animation::AnimationTargetId": "57000149-06ed-5050-83aa-f9ff99695e9d",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandThumb2",
+      "transform": {
+        "translation": [
+          -0.10612726,
+          3.8792732,
+          -0.0000074505806
+        ],
+        "rotation": [
+          0.09875687,
+          2.6205136e-8,
+          3.6991358e-7,
+          0.99511164
+        ],
+        "scale": [
+          1.0,
+          0.9999998,
+          0.9999999
+        ]
+      },
+      "parent": 30,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "60abccbc-8c7c-57c9-876b-82984d840ac7"
+      }
+    },
+    {
+      "name": "mixamorig:RightHandThumb2",
+      "transform": {
+        "translation": [
+          0.051795244,
+          3.8062325,
+          5.9604645e-8
+        ],
+        "rotation": [
+          0.1068851,
+          -4.926982e-7,
+          -1.3453187e-7,
+          0.9942714
+        ],
+        "scale": [
+          1.0000001,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 9,
+      "components": {
+        "bevy_animation::AnimationTargetId": "5d27f094-01a2-5a69-b6a7-d2736292df25",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightHandPinky3",
+      "transform": {
+        "translation": [
+          -0.009296417,
+          2.9160042,
+          0.000005722046
+        ],
+        "rotation": [
+          0.04724453,
+          3.533658e-7,
+          2.4241453e-8,
+          0.99888337
+        ],
+        "scale": [
+          1.0000001,
+          1.0000001,
+          0.99999994
+        ]
+      },
+      "parent": 76,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "2b874e81-8664-5ec9-bdc3-a22bba96807c"
+      }
+    },
+    {
+      "name": "mixamorig:RightHandMiddle2",
+      "transform": {
+        "translation": [
+          0.004516363,
+          4.2984734,
+          0.000003993511
+        ],
+        "rotation": [
+          0.13019074,
+          1.3807963e-7,
+          5.4950053e-8,
+          0.99148893
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          1.0
+        ]
+      },
+      "parent": 61,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "140e04fb-b32a-5838-91df-5185cf298707"
+      }
+    },
+    {
+      "name": "mixamorig:RightHandThumb3",
+      "transform": {
+        "translation": [
+          0.3815441,
+          4.331821,
+          -2.5331974e-7
+        ],
+        "rotation": [
+          -0.03113633,
+          -2.2735296e-7,
+          4.5645297e-7,
+          0.9995152
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          0.99999994
+        ]
+      },
+      "parent": 5,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "601d853f-431c-5e0e-94ea-23572e6c5a9b"
+      }
+    },
+    {
+      "name": "mixamorig:RightHandThumb1",
+      "transform": {
+        "translation": [
+          3.0081449,
+          3.3732193,
+          1.4876478
+        ],
+        "rotation": [
+          0.14835493,
+          -0.05532672,
+          -0.34502077,
+          0.9251435
+        ],
+        "scale": [
+          0.9999999,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 27,
+      "components": {
+        "bevy_animation::AnimationTargetId": "0df8f76d-ba39-51f1-9834-113f14e9fd5f",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandRing2",
+      "transform": {
+        "translation": [
+          -0.031574965,
+          3.8703136,
+          -0.000009417534
+        ],
+        "rotation": [
+          0.10707458,
+          2.3370862e-7,
+          7.4468275e-8,
+          0.994251
+        ],
+        "scale": [
+          0.9999998,
+          0.9999998,
+          0.99999994
+        ]
+      },
+      "parent": 16,
+      "components": {
+        "bevy_animation::AnimationTargetId": "4664bcf5-d377-5f01-9373-9a601f2f4639",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightHandRing1",
+      "transform": {
+        "translation": [
+          -1.4215586,
+          12.361708,
+          -0.109363675
+        ],
+        "rotation": [
+          0.02453229,
+          0.0019752667,
+          0.08023459,
+          0.9964721
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          1.0
+        ]
+      },
+      "parent": 27,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "9fa5acaa-48c5-527b-820a-aac11f43b4e2"
+      }
+    },
+    {
+      "name": "mixamorig:RightFoot",
+      "transform": {
+        "translation": [
+          0.0000011119992,
+          46.99737,
+          2.0861626e-7
+        ],
+        "rotation": [
+          0.53830314,
+          0.058398847,
+          -0.037428085,
+          0.8398919
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 75,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "b7a008ad-46f8-523e-97a7-2241fef6a68f"
+      }
+    },
+    {
+      "name": "mixamorig:RightShoulder",
+      "transform": {
+        "translation": [
+          -5.7752376,
+          11.912332,
+          -0.3811636
+        ],
+        "rotation": [
+          0.55579937,
+          -0.42479512,
+          0.59361064,
+          0.39782247
+        ],
+        "scale": [
+          0.9999998,
+          0.9999998,
+          0.99999976
+        ]
+      },
+      "parent": 38,
+      "components": {
+        "bevy_animation::AnimationTargetId": "76ffbf00-99e6-5f48-a769-15a19bd23bd7",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandIndex2",
+      "transform": {
+        "translation": [
+          0.02599287,
+          3.8103232,
+          0.000011146069
+        ],
+        "rotation": [
+          0.11273694,
+          3.4023918e-7,
+          -6.5142196e-8,
+          0.99362487
+        ],
+        "scale": [
+          1.0,
+          1.0000002,
+          1.0
+        ]
+      },
+      "parent": 52,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "228406db-3433-5cac-84e7-856fc2a4d9dc"
+      }
+    },
+    {
+      "name": "mixamorig:LeftFoot",
+      "transform": {
+        "translation": [
+          0.000004058238,
+          47.030697,
+          0.000002503395
+        ],
+        "rotation": [
+          0.5400778,
+          -0.058006,
+          0.037348296,
+          0.8387827
+        ],
+        "scale": [
+          1.0,
+          0.9999998,
+          0.99999994
+        ]
+      },
+      "parent": 59,
+      "components": {
+        "bevy_animation::AnimationTargetId": "aebb97b5-3fea-5425-91c3-e217038550ac",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandRing1",
+      "transform": {
+        "translation": [
+          1.3892012,
+          12.161774,
+          -0.11566055
+        ],
+        "rotation": [
+          0.023624865,
+          -0.0022939474,
+          -0.09659935,
+          0.99504036
+        ],
+        "scale": [
+          0.99999994,
+          0.9999998,
+          0.9999998
+        ]
+      },
+      "parent": 17,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "b9c9d86a-6f7b-51db-b02b-9f582204f466"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHand",
+      "transform": {
+        "translation": [
+          -2.3841858e-7,
+          23.525635,
+          -0.0000021457672
+        ],
+        "rotation": [
+          0.15413591,
+          0.037343528,
+          -0.06689071,
+          0.98507524
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 56,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "75163cc3-0d28-593d-8ba9-c411544b110e"
+      }
+    },
+    {
+      "name": "mixamorig:RightHandIndex3",
+      "transform": {
+        "translation": [
+          0.0064389706,
+          3.695181,
+          -0.00000423193
+        ],
+        "rotation": [
+          0.037016425,
+          -9.594542e-7,
+          1.5307464e-7,
+          0.99931467
+        ],
+        "scale": [
+          0.99999994,
+          1.0,
+          1.0000001
+        ]
+      },
+      "parent": 34,
+      "components": {
+        "bevy_animation::AnimationTargetId": "1c2f0502-0b11-5c13-8b83-f420cc539aa4",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandMiddle1",
+      "transform": {
+        "translation": [
+          -1.166447,
+          12.33424,
+          -0.29944187
+        ],
+        "rotation": [
+          0.06570463,
+          -0.0017915443,
+          -0.027195754,
+          0.99746686
+        ],
+        "scale": [
+          1.0,
+          0.9999999,
+          0.99999994
+        ]
+      },
+      "parent": 17,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "1e636cdb-410e-5d09-9737-222198a2d4f1"
+      }
+    },
+    {
+      "name": "jan",
+      "transform": {
+        "translation": [
+          -1.75,
+          0.0,
+          8.75
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "components": {
+        "jackdaw_jsn::types::GltfSource": {
+          "path": "C:\\Users\\phino\\RustProj\\jackdaw\\assets\\jan\\jan.gltf",
+          "scene_index": 0
+        }
+      }
+    },
+    {
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 49
+    },
+    {
+      "name": "mixamorig:RightHandRing3",
+      "transform": {
+        "translation": [
+          -0.007817149,
+          3.534578,
+          -0.0000047683716
+        ],
+        "rotation": [
+          0.059121463,
+          -0.0000011000117,
+          -1.69098e-7,
+          0.9982508
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          1.0
+        ]
+      },
+      "parent": 0,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "0ace2d7c-0a1f-5d6c-ab92-38838405dd9e"
+      }
+    },
+    {
+      "name": "mixamorig:RightArm",
+      "transform": {
+        "translation": [
+          -0.0000014305115,
+          12.262311,
+          0.000025987625
+        ],
+        "rotation": [
+          0.12201671,
+          0.0049727997,
+          0.040416777,
+          0.99169236
+        ],
+        "scale": [
+          1.0000001,
+          1.0000001,
+          1.0000001
+        ]
+      },
+      "parent": 13,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "e6b25141-866f-51c7-ad2c-ae4a25d5b52a"
+      }
+    },
+    {
+      "name": "mixamorig:LeftArm",
+      "transform": {
+        "translation": [
+          -8.34465e-7,
+          12.262304,
+          0.000008106232
+        ],
+        "rotation": [
+          0.12157242,
+          -0.0052234507,
+          -0.0426065,
+          0.991654
+        ],
+        "scale": [
+          0.99999994,
+          0.99999994,
+          0.99999994
+        ]
+      },
+      "parent": 63,
+      "components": {
+        "bevy_animation::AnimationTargetId": "9ed35e79-6776-56f3-8b3d-b40eb6f969ac",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:Head",
+      "transform": {
+        "translation": [
+          0.0,
+          8.077669,
+          3.6162813
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 68,
+      "components": {
+        "bevy_animation::AnimationTargetId": "533562c1-ffb9-59b7-aeb2-fdeb21e7537c",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightUpLeg",
+      "transform": {
+        "translation": [
+          -9.207344,
+          -5.070396,
+          0.62932616
+        ],
+        "rotation": [
+          0.00012132324,
+          -0.0029068955,
+          0.9991139,
+          0.04198656
+        ],
+        "scale": [
+          1.0000123,
+          1.0000001,
+          0.99999994
+        ]
+      },
+      "parent": 47,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "ade56ab4-f6f4-5321-8719-311df9fce2db"
+      }
+    },
+    {
+      "name": "mixamorig:RightHand",
+      "transform": {
+        "translation": [
+          0.000007033348,
+          23.537046,
+          0.00001001358
+        ],
+        "rotation": [
+          0.15505736,
+          -0.035774782,
+          0.07395594,
+          0.9844836
+        ],
+        "scale": [
+          0.9999999,
+          0.9999999,
+          0.9999999
+        ]
+      },
+      "parent": 46,
+      "components": {
+        "bevy_animation::AnimationTargetId": "0e9581a4-7976-5144-b335-df12bed85f5d",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandRing3",
+      "transform": {
+        "translation": [
+          -0.00042295456,
+          3.653749,
+          -0.0000044107437
+        ],
+        "rotation": [
+          0.13760243,
+          0.0000013348849,
+          2.447044e-7,
+          0.9904876
+        ],
+        "scale": [
+          1.0,
+          1.0000001,
+          0.99999994
+        ]
+      },
+      "parent": 10,
+      "components": {
+        "bevy_animation::AnimationTargetId": "b278423c-6f97-5c67-b644-016bbd6e09c1",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandIndex4",
+      "transform": {
+        "translation": [
+          -0.0064413548,
+          3.1190538,
+          -0.000010930002
+        ],
+        "rotation": [
+          1.5133992e-8,
+          -5.587936e-9,
+          -3.7252907e-9,
+          1.0
+        ],
+        "scale": [
+          0.99999994,
+          0.99999994,
+          1.0
+        ]
+      },
+      "parent": 73,
+      "components": {
+        "bevy_animation::AnimationTargetId": "60730363-6e30-5837-b0d0-72dd41258101",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandThumb1",
+      "transform": {
+        "translation": [
+          -3.103396,
+          3.3991323,
+          1.5316303
+        ],
+        "rotation": [
+          0.14998509,
+          0.055696324,
+          0.34363258,
+          0.9253751
+        ],
+        "scale": [
+          0.9999997,
+          0.9999999,
+          0.99999994
+        ]
+      },
+      "parent": 17,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "b80f3e68-eec4-5795-8857-d1b0671bb776"
+      }
+    },
+    {
+      "name": "mixamorig:Spine1",
+      "transform": {
+        "translation": [
+          1.8626451e-9,
+          10.804949,
+          -0.0000019073486
+        ],
+        "rotation": [
+          1.1175873e-8,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          0.99999994
+        ]
+      },
+      "parent": 2,
+      "components": {
+        "bevy_animation::AnimationTargetId": "105fee43-b166-5849-83f5-23812aa5b48c",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightHandThumb4",
+      "transform": {
+        "translation": [
+          -0.43335485,
+          4.0398407,
+          -0.0000044703484
+        ],
+        "rotation": [
+          5.5879363e-9,
+          7.450581e-8,
+          -2.0023437e-8,
+          1.0
+        ],
+        "scale": [
+          0.9999999,
+          0.99999994,
+          0.99999994
+        ]
+      },
+      "parent": 8,
+      "components": {
+        "bevy_animation::AnimationTargetId": "c88c3575-5fe6-590c-8de3-d8a9f2c36d35",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 49
+    },
+    {
+      "name": "mixamorig:RightHandIndex2",
+      "transform": {
+        "translation": [
+          -0.020260572,
+          4.000064,
+          0.000005811453
+        ],
+        "rotation": [
+          0.10379301,
+          0.0000015122539,
+          -5.922604e-8,
+          0.9945989
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          0.99999994
+        ]
+      },
+      "parent": 58,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "ab59c3d9-cd78-5985-8c42-15eda9e5117e"
+      }
+    },
+    {
+      "name": "mixamorig:LeftToeBase",
+      "transform": {
+        "translation": [
+          5.662441e-7,
+          15.705047,
+          5.9604645e-7
+        ],
+        "rotation": [
+          0.29539296,
+          -0.057349917,
+          0.017766729,
+          0.95348746
+        ],
+        "scale": [
+          0.99999994,
+          1.0000001,
+          0.99999994
+        ]
+      },
+      "parent": 15,
+      "components": {
+        "bevy_animation::AnimationTargetId": "010474af-2652-5d13-9695-15e5d5e881b9",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightHandMiddle4",
+      "transform": {
+        "translation": [
+          -0.0023765564,
+          3.4571211,
+          -0.0000053942204
+        ],
+        "rotation": [
+          -4.0745363e-9,
+          2.9336661e-8,
+          1.6763806e-8,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          1.0
+        ]
+      },
+      "parent": 48,
+      "components": {
+        "bevy_animation::AnimationTargetId": "fb53005e-b5bd-50a2-8b50-de50fd2c975a",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 20
+    },
+    {
+      "name": "mixamorig:Spine2",
+      "transform": {
+        "translation": [
+          0.0,
+          12.348531,
+          0.0
+        ],
+        "rotation": [
+          -3.7252896e-8,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0000001,
+          1.0000001
+        ]
+      },
+      "parent": 31,
+      "components": {
+        "bevy_animation::AnimationTargetId": "1f10bca0-ccd5-5c6a-a5af-a7f7c1dd9763",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftToe_End",
+      "transform": {
+        "translation": [
+          -0.000001763925,
+          6.3738165,
+          -1.6577542e-7
+        ],
+        "rotation": [
+          3.9464794e-8,
+          7.042836e-7,
+          8.5128704e-10,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0000001
+        ]
+      },
+      "parent": 35,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "3e657ac8-62cc-5ccc-80d2-02259ce84284"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandThumb3",
+      "transform": {
+        "translation": [
+          -0.28083575,
+          4.295801,
+          -0.0000027567148
+        ],
+        "rotation": [
+          -0.02858002,
+          -4.062226e-7,
+          5.8464376e-8,
+          0.9995915
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          0.99999994
+        ]
+      },
+      "parent": 4,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "25fa6f8f-7238-5125-bac6-5475034743e2"
+      }
+    },
+    {
+      "name": "Armature",
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.7071068,
+          0.0,
+          0.0,
+          0.7071068
+        ],
+        "scale": [
+          0.01,
+          0.01,
+          0.01
+        ]
+      },
+      "parent": 37,
+      "components": {
+        "bevy_animation::AnimationPlayer": {
+          "active_animations": {}
+        },
+        "bevy_animation::AnimationTargetId": "8dba8a40-b23f-5a89-84fb-5000a8a9dc19",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightHandPinky1",
+      "transform": {
+        "translation": [
+          -3.6092873,
+          11.460287,
+          -0.08173728
+        ],
+        "rotation": [
+          0.03301076,
+          0.004104327,
+          0.12330759,
+          0.9918108
+        ],
+        "scale": [
+          0.9999998,
+          0.9999998,
+          1.0000001
+        ]
+      },
+      "parent": 27,
+      "components": {
+        "bevy_animation::AnimationTargetId": "ba66c60c-2bd8-5262-9ab1-459d507b7ea4",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "Mesh.002.jan.002",
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 60,
+      "components": {
+        "bevy_gltf::assets::GltfMaterialName": "jan.002",
+        "bevy_gltf::assets::GltfMeshName": "Mesh.002"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandPinky2",
+      "transform": {
+        "translation": [
+          -0.020424843,
+          3.5634038,
+          0.000012874603
+        ],
+        "rotation": [
+          0.07956329,
+          -6.2036486e-7,
+          -1.6256548e-7,
+          0.99682987
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          0.99999994
+        ]
+      },
+      "parent": 51,
+      "components": {
+        "bevy_animation::AnimationTargetId": "bde150c5-ba72-53e9-af24-fa6efcb8ecea",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandPinky4",
+      "transform": {
+        "translation": [
+          0.010030746,
+          2.627102,
+          -0.00001168251
+        ],
+        "rotation": [
+          -6.0535976e-9,
+          2.7939682e-9,
+          -1.8626454e-9,
+          1.0
+        ],
+        "scale": [
+          0.9999998,
+          0.99999994,
+          0.99999994
+        ]
+      },
+      "parent": 70,
+      "components": {
+        "bevy_animation::AnimationTargetId": "76e17edb-16e1-5984-b5cc-a737bb04d17c",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightForeArm",
+      "transform": {
+        "translation": [
+          0.0000019073486,
+          28.480759,
+          -0.00002360344
+        ],
+        "rotation": [
+          0.013624778,
+          -0.001398182,
+          -0.102073796,
+          0.99468255
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          0.99999994
+        ]
+      },
+      "parent": 23,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "5fb9e3f1-8451-5123-b72b-05407c7e9ac5"
+      }
+    },
+    {
+      "name": "mixamorig:Hips",
+      "transform": {
+        "translation": [
+          0.017463684,
+          -4.5855136,
+          -107.2389
+        ],
+        "rotation": [
+          -0.70710677,
+          0.0,
+          0.0,
+          0.70710677
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 41,
+      "components": {
+        "bevy_animation::AnimationTargetId": "f0ccf59f-6667-5943-adbe-f200ac186c15",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightHandMiddle3",
+      "transform": {
+        "translation": [
+          -0.002140522,
+          3.8843567,
+          -8.34465e-7
+        ],
+        "rotation": [
+          0.014480189,
+          -0.000001294674,
+          -1.7231272e-8,
+          0.9998952
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          0.99999994
+        ]
+      },
+      "parent": 7,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "8e154405-9743-5ecc-a725-bc5723b6f070"
+      }
+    },
+    {
+      "name": "Brush",
+      "transform": {
+        "translation": [
+          -5.0,
+          1.5,
+          9.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "components": {
+        "jackdaw_jsn::types::Brush": {
+          "faces": [
+            {
+              "material_index": 0,
+              "material_name": null,
+              "plane": {
+                "distance": 1.25,
+                "normal": [
+                  1.0,
+                  0.0,
+                  0.0
+                ]
+              },
+              "texture_path": null,
+              "uv_offset": [
+                0.0,
+                0.0
+              ],
+              "uv_rotation": 0.0,
+              "uv_scale": [
+                1.0,
+                1.0
+              ]
+            },
+            {
+              "material_index": 0,
+              "material_name": null,
+              "plane": {
+                "distance": 1.25,
+                "normal": [
+                  -1.0,
+                  0.0,
+                  0.0
+                ]
+              },
+              "texture_path": null,
+              "uv_offset": [
+                0.0,
+                0.0
+              ],
+              "uv_rotation": 0.0,
+              "uv_scale": [
+                1.0,
+                1.0
+              ]
+            },
+            {
+              "material_index": 0,
+              "material_name": null,
+              "plane": {
+                "distance": 1.5,
+                "normal": [
+                  0.0,
+                  1.0,
+                  0.0
+                ]
+              },
+              "texture_path": null,
+              "uv_offset": [
+                0.0,
+                0.0
+              ],
+              "uv_rotation": 0.0,
+              "uv_scale": [
+                1.0,
+                1.0
+              ]
+            },
+            {
+              "material_index": 0,
+              "material_name": null,
+              "plane": {
+                "distance": 1.5,
+                "normal": [
+                  0.0,
+                  -1.0,
+                  0.0
+                ]
+              },
+              "texture_path": null,
+              "uv_offset": [
+                0.0,
+                0.0
+              ],
+              "uv_rotation": 0.0,
+              "uv_scale": [
+                1.0,
+                1.0
+              ]
+            },
+            {
+              "material_index": 0,
+              "material_name": null,
+              "plane": {
+                "distance": 1.25,
+                "normal": [
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              "texture_path": null,
+              "uv_offset": [
+                0.0,
+                0.0
+              ],
+              "uv_rotation": 0.0,
+              "uv_scale": [
+                1.0,
+                1.0
+              ]
+            },
+            {
+              "material_index": 0,
+              "material_name": null,
+              "plane": {
+                "distance": 1.25,
+                "normal": [
+                  0.0,
+                  0.0,
+                  -1.0
+                ]
+              },
+              "texture_path": null,
+              "uv_offset": [
+                0.0,
+                0.0
+              ],
+              "uv_rotation": 0.0,
+              "uv_scale": [
+                1.0,
+                1.0
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 49
+    },
+    {
+      "name": "mixamorig:LeftHandPinky1",
+      "transform": {
+        "translation": [
+          3.6070533,
+          11.322323,
+          -0.07616866
+        ],
+        "rotation": [
+          0.042930145,
+          -0.0057964213,
+          -0.1336601,
+          0.99008006
+        ],
+        "scale": [
+          0.9999998,
+          0.9999997,
+          0.9999998
+        ]
+      },
+      "parent": 17,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "3821773f-f666-5b50-879d-cd85901dc1dd"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandIndex1",
+      "transform": {
+        "translation": [
+          -3.8298054,
+          12.247491,
+          -0.0696314
+        ],
+        "rotation": [
+          0.045988087,
+          0.0025530646,
+          0.055374134,
+          0.9974028
+        ],
+        "scale": [
+          0.99999994,
+          0.9999998,
+          0.99999994
+        ]
+      },
+      "parent": 17,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "98299493-4584-5dfb-854f-fd7e4721dfdb"
+      }
+    },
+    {
+      "name": "mixamorig:RightHandIndex4",
+      "transform": {
+        "translation": [
+          0.0138196945,
+          3.3229237,
+          5.5134296e-7
+        ],
+        "rotation": [
+          6.7520887e-9,
+          -2.7939677e-9,
+          9.080395e-9,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          0.99999994,
+          1.0
+        ]
+      },
+      "parent": 18,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "0dd019e4-2784-5b97-bf07-de1908a2c61f"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandRing4",
+      "transform": {
+        "translation": [
+          0.031999588,
+          3.1427968,
+          -0.0000052452087
+        ],
+        "rotation": [
+          3.72529e-9,
+          -1.2136297e-7,
+          1.8626451e-9,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          0.9999999
+        ]
+      },
+      "parent": 28,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "5e2806e6-27d3-5668-a1f6-214f25ec9bf4"
+      }
+    },
+    {
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 49
+    },
+    {
+      "name": "mixamorig:LeftForeArm",
+      "transform": {
+        "translation": [
+          -0.0000038146973,
+          28.48277,
+          0.0000042915344
+        ],
+        "rotation": [
+          0.0135287875,
+          0.0013847154,
+          0.10180453,
+          0.99471146
+        ],
+        "scale": [
+          0.9999999,
+          0.9999998,
+          1.0
+        ]
+      },
+      "parent": 24,
+      "components": {
+        "bevy_animation::AnimationTargetId": "5bfd52bd-614e-5889-bc7c-9fea1fdc84d8",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 49
+    },
+    {
+      "name": "mixamorig:RightHandIndex1",
+      "transform": {
+        "translation": [
+          3.8710375,
+          11.850587,
+          -0.107654095
+        ],
+        "rotation": [
+          0.04216157,
+          -0.002219689,
+          -0.05250943,
+          0.9977276
+        ],
+        "scale": [
+          0.99999994,
+          0.99999994,
+          1.0
+        ]
+      },
+      "parent": 27,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "45be3ee6-1cf9-56ea-a532-ab41c56dd62c"
+      }
+    },
+    {
+      "name": "mixamorig:LeftLeg",
+      "transform": {
+        "translation": [
+          5.1618554e-7,
+          47.395287,
+          2.0452308e-7
+        ],
+        "rotation": [
+          -0.09540234,
+          -0.0021816278,
+          0.022756314,
+          0.99517626
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 64,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "397cb8f5-af8b-55fc-9928-95baf25b7d99"
+      }
+    },
+    {
+      "name": "base_mesh.001",
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 41,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "7542249f-c44f-594c-987e-00f1b504b5c2"
+      }
+    },
+    {
+      "name": "mixamorig:RightHandMiddle1",
+      "transform": {
+        "translation": [
+          1.159805,
+          12.541499,
+          -0.20524162
+        ],
+        "rotation": [
+          0.055053268,
+          0.0007390936,
+          0.013404952,
+          0.9983932
+        ],
+        "scale": [
+          0.9999999,
+          0.9999999,
+          1.0
+        ]
+      },
+      "parent": 27,
+      "components": {
+        "bevy_animation::AnimationTargetId": "94ecd34e-9080-5076-92e3-71c93c2f6eaf",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightToe_End",
+      "transform": {
+        "translation": [
+          0.0000018551946,
+          6.4730554,
+          -3.2410026e-7
+        ],
+        "rotation": [
+          -3.1548552e-8,
+          -6.422051e-7,
+          -1.1168593e-8,
+          1.0
+        ],
+        "scale": [
+          1.0000001,
+          1.0000001,
+          1.0
+        ]
+      },
+      "parent": 3,
+      "components": {
+        "bevy_animation::AnimationTargetId": "963cd92c-5dc6-5d32-af94-604d175ee9c0",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:LeftShoulder",
+      "transform": {
+        "translation": [
+          5.7752376,
+          11.909519,
+          -0.3664236
+        ],
+        "rotation": [
+          0.5566479,
+          0.424149,
+          -0.5930064,
+          0.39822662
+        ],
+        "scale": [
+          0.99999964,
+          0.99999976,
+          0.9999998
+        ]
+      },
+      "parent": 38,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "97a72ca8-8963-5fc9-a1a1-959bc2301d81"
+      }
+    },
+    {
+      "name": "mixamorig:LeftUpLeg",
+      "transform": {
+        "translation": [
+          9.207344,
+          -5.070396,
+          0.62760216
+        ],
+        "rotation": [
+          0.0000629787,
+          0.0015090808,
+          -0.999117,
+          0.041987207
+        ],
+        "scale": [
+          1.0000124,
+          1.0,
+          0.99999994
+        ]
+      },
+      "parent": 47,
+      "components": {
+        "bevy_animation::AnimationTargetId": "cb727a51-c253-5756-b12d-4565f0574715",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:HeadTop_End",
+      "transform": {
+        "translation": [
+          0.0,
+          21.512909,
+          9.631077
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 25,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "4946384f-e095-5150-a758-17dd877de92e"
+      }
+    },
+    {
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 49
+    },
+    {
+      "name": "mixamorig:LeftHandMiddle3",
+      "transform": {
+        "translation": [
+          -0.001773119,
+          3.969055,
+          -0.000004708767
+        ],
+        "rotation": [
+          -0.0010465605,
+          0.0000010160735,
+          -2.4214401e-8,
+          0.99999946
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 71,
+      "components": {
+        "bevy_animation::AnimationTargetId": "6a008a08-6d74-58e8-be02-3fb730ae2944",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:Neck",
+      "transform": {
+        "translation": [
+          1.8626451e-9,
+          13.89208,
+          0.000002861023
+        ],
+        "rotation": [
+          0.09310682,
+          0.0,
+          0.0,
+          0.99565613
+        ],
+        "scale": [
+          1.0,
+          0.9999997,
+          1.0
+        ]
+      },
+      "parent": 38,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "def8165f-383a-51f2-a11b-d115c34486b4"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandMiddle4",
+      "transform": {
+        "translation": [
+          -0.0015518665,
+          3.5647514,
+          -0.0000036358833
+        ],
+        "rotation": [
+          1.5133992e-9,
+          6.1932944e-8,
+          5.5879346e-9,
+          1.0
+        ],
+        "scale": [
+          1.0000001,
+          1.0000001,
+          1.0000001
+        ]
+      },
+      "parent": 67,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "ed084030-a77a-5aaf-8494-9186fba44cc5"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandPinky3",
+      "transform": {
+        "translation": [
+          0.010390282,
+          2.833185,
+          0.0000038146973
+        ],
+        "rotation": [
+          0.0027564948,
+          0.000001658692,
+          2.5518335e-7,
+          0.9999962
+        ],
+        "scale": [
+          0.99999994,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 44,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "e96ce908-b318-5e92-8dc1-78341566c1c2"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandMiddle2",
+      "transform": {
+        "translation": [
+          0.003323555,
+          4.3015614,
+          -0.000012695789
+        ],
+        "rotation": [
+          0.11550959,
+          -5.363063e-7,
+          -8.7665455e-8,
+          0.9933064
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 19,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "4c84aff2-405e-59e4-98fb-2f6117e1b6ab"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandThumb4",
+      "transform": {
+        "translation": [
+          0.38697672,
+          3.930996,
+          0.000014394522
+        ],
+        "rotation": [
+          5.5879354e-9,
+          0.0,
+          -2.3283064e-8,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          0.9999999,
+          1.0
+        ]
+      },
+      "parent": 40,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "0a81ad74-b892-57be-b373-974f86aab40f"
+      }
+    },
+    {
+      "name": "mixamorig:LeftHandIndex3",
+      "transform": {
+        "translation": [
+          -0.019551277,
+          3.6144521,
+          -6.7800283e-7
+        ],
+        "rotation": [
+          -0.030939497,
+          7.2864304e-7,
+          -7.221207e-8,
+          0.99952126
+        ],
+        "scale": [
+          1.0000001,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 14,
+      "components": {
+        "bevy_animation::AnimationTargetId": "c32f4bc6-0790-556c-b092-abff199befb6",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "transform": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 49
+    },
+    {
+      "name": "mixamorig:RightLeg",
+      "transform": {
+        "translation": [
+          -1.5436672e-7,
+          47.39587,
+          6.277878e-7
+        ],
+        "rotation": [
+          -0.09219626,
+          0.0021034789,
+          -0.022730691,
+          0.9954792
+        ],
+        "scale": [
+          0.9999999,
+          1.0,
+          0.99999994
+        ]
+      },
+      "parent": 26,
+      "components": {
+        "bevy_animation::AnimationTargetId": "f6dba773-e119-5048-8bc6-91fabe6df82e",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    },
+    {
+      "name": "mixamorig:RightHandPinky2",
+      "transform": {
+        "translation": [
+          0.033802032,
+          3.555506,
+          -0.000002026558
+        ],
+        "rotation": [
+          0.08989854,
+          -2.1180216e-7,
+          3.5534132e-8,
+          0.99595094
+        ],
+        "scale": [
+          1.0,
+          1.0000001,
+          1.0
+        ]
+      },
+      "parent": 42,
+      "components": {
+        "bevy_animation::AnimatedBy": 12884901032,
+        "bevy_animation::AnimationTargetId": "fc3c4914-66eb-5e04-b4fc-89b0d4ee25c8"
+      }
+    },
+    {
+      "name": "Sun",
+      "transform": {
+        "translation": [
+          10.0,
+          20.0,
+          10.0
+        ],
+        "rotation": [
+          -0.3816559,
+          0.18298657,
+          -0.07736548,
+          0.9027011
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "components": {
+        "bevy_light::cascade::CascadeShadowConfig": {
+          "bounds": [
+            10.0,
+            24.662120819091797,
+            60.822021484375,
+            149.99998474121094
+          ],
+          "minimum_distance": 0.10000000149011612,
+          "overlap_proportion": 0.20000000298023224
+        },
+        "bevy_light::directional_light::DirectionalLight": {
+          "affects_lightmapped_mesh_diffuse": true,
+          "color": {
+            "LinearRgba": {
+              "alpha": 1.0,
+              "blue": 1.0,
+              "green": 1.0,
+              "red": 1.0
+            }
+          },
+          "illuminance": 10000.0,
+          "shadow_depth_bias": 0.019999999552965164,
+          "shadow_normal_bias": 1.7999999523162842,
+          "shadows_enabled": true
+        }
+      }
+    },
+    {
+      "name": "mixamorig:RightHandPinky4",
+      "transform": {
+        "translation": [
+          -0.024503231,
+          2.5859761,
+          0.0000047683716
+        ],
+        "rotation": [
+          1.4901161e-8,
+          4.656613e-10,
+          -9.313226e-10,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "parent": 6,
+      "components": {
+        "bevy_animation::AnimationTargetId": "9fc78f42-85d2-5083-b70a-aff3020d81d9",
+        "bevy_animation::AnimatedBy": 12884901032
+      }
+    }
+  ]
+}
