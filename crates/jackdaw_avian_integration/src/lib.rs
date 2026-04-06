@@ -126,9 +126,19 @@ pub fn register_avian_types(app: &mut App) {
         // State
         .register_type::<RigidBodyDisabled>()
         .register_type::<Sleeping>()
-        .register_type::<SleepingDisabled>();
-    // NOTE: Restitution, Friction, CollisionLayers, ColliderDensity are not
-    // registrable in avian3d 0.5 — they lack `reflect(Default)`.
+        .register_type::<SleepingDisabled>()
+        // Internal avian components — registered so the inspector can display
+        // them when added via `#[require]`. Not all have ReflectDefault, so
+        // they won't appear in the component picker, only in the inspector.
+        .register_type::<Position>()
+        .register_type::<Rotation>()
+        .register_type::<CollisionLayers>()
+        .register_type::<ColliderDensity>()
+        .register_type::<SleepThreshold>()
+        .register_type::<SleepTimer>();
+    // NOTE: Many more avian internal types (ColliderAabb, ComputedMass,
+    // ColliderMassProperties, etc.) also exist but may not be publicly
+    // exported from avian3d::prelude. Register more as needed.
 }
 
 /// Convert a parry3d nalgebra Point to bevy Vec3.

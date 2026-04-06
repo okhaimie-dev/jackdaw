@@ -170,6 +170,21 @@ pub struct AddComponent {
     pub type_id: TypeId,
     pub component_id: ComponentId,
     pub type_path: String,
+    /// Type paths of components that were auto-promoted to the AST via
+    /// `#[require]` during `execute`. Cleaned up on `undo`.
+    promoted_components: Vec<String>,
+}
+
+impl AddComponent {
+    pub fn new(entity: Entity, type_id: TypeId, component_id: ComponentId, type_path: String) -> Self {
+        Self {
+            entity,
+            type_id,
+            component_id,
+            type_path,
+            promoted_components: Vec::new(),
+        }
+    }
 }
 
 impl EditorCommand for AddComponent {
@@ -191,13 +206,16 @@ impl EditorCommand for AddComponent {
             return;
         };
 
+        // Insert the component — this triggers #[require] which may add
+        // many more components (e.g. RigidBody requires Position, Rotation,
+        // LinearVelocity, etc.).
         reflect_component.insert(
             &mut world.entity_mut(self.entity),
             default_value.as_partial_reflect(),
             &registry,
         );
 
-        // Sync to AST
+        // Sync the explicitly-added component to AST
         let serializer =
             bevy::reflect::serde::TypedReflectSerializer::new(default_value.as_ref(), &registry);
         if let Ok(json_value) = serde_json::to_value(&serializer) {
@@ -206,18 +224,26 @@ impl EditorCommand for AddComponent {
                 .resource_mut::<jackdaw_jsn::SceneJsnAst>()
                 .set_component(self.entity, &self.type_path, json_value);
         }
+
+        // Sync any components added by #[require] to the AST so they're
+        // editable and persist with the scene. This captures avian physics
+        // internals, required transform components, etc.
+        self.promoted_components = sync_required_to_ast(world, self.entity);
     }
 
     fn undo(&mut self, world: &mut World) {
         if let Ok(mut entity) = world.get_entity_mut(self.entity) {
             entity.remove_by_id(self.component_id);
         }
-        // Remove from AST
+        // Remove the explicitly-added component + all promoted components from AST
         if let Some(node) = world
             .resource_mut::<jackdaw_jsn::SceneJsnAst>()
             .node_for_entity_mut(self.entity)
         {
             node.components.remove(&self.type_path);
+            for promoted in &self.promoted_components {
+                node.components.remove(promoted);
+            }
         }
     }
 
@@ -649,4 +675,85 @@ pub fn sync_component_to_ast<T: bevy::reflect::Reflect>(
             .resource_mut::<jackdaw_jsn::SceneJsnAst>()
             .set_component(entity, type_path, json_value);
     }
+}
+
+/// Scan an entity for reflected components that exist in the ECS but not yet
+/// in the JSN AST, and serialize them into the AST.
+///
+/// This captures components added implicitly by Bevy's `#[require]`
+/// attributes (e.g., `RigidBody` requiring `Position`, `Rotation`,
+/// `LinearVelocity`, etc.). After this call, those components are editable
+/// in the inspector via the normal `SetJsnField` path and persist with
+/// scene save/load.
+///
+/// Designed to be upstream-compatible with BSN — the AST becomes the full
+/// authoritative representation, not just the user's explicit additions.
+///
+/// Returns the type paths of newly-promoted components (for undo cleanup).
+pub fn sync_required_to_ast(world: &mut World, entity: Entity) -> Vec<String> {
+    use std::collections::HashSet;
+
+    let registry = world.resource::<AppTypeRegistry>().clone();
+    let reg = registry.read();
+
+    // Snapshot what's currently in the AST for this entity
+    let existing: HashSet<String> = world
+        .resource::<jackdaw_jsn::SceneJsnAst>()
+        .node_for_entity(entity)
+        .map(|n| n.components.keys().cloned().collect())
+        .unwrap_or_default();
+
+    let skip_ids: HashSet<TypeId> = HashSet::from([
+        TypeId::of::<GlobalTransform>(),
+        TypeId::of::<InheritedVisibility>(),
+        TypeId::of::<ViewVisibility>(),
+        TypeId::of::<ChildOf>(),
+        TypeId::of::<Children>(),
+    ]);
+
+    let processor = crate::scene_io::AstSerializerProcessor;
+    let Ok(entity_ref) = world.get_entity(entity) else {
+        return vec![];
+    };
+
+    // Collect serializable components not yet in the AST
+    let mut to_add: Vec<(String, serde_json::Value)> = Vec::new();
+
+    for registration in reg.iter() {
+        if skip_ids.contains(&registration.type_id()) {
+            continue;
+        }
+        let type_path = registration.type_info().type_path_table().path().to_string();
+        if existing.contains(&type_path) {
+            continue;
+        }
+        if crate::scene_io::should_skip_component(&type_path) {
+            continue;
+        }
+        let Some(reflect_component) = registration.data::<ReflectComponent>() else {
+            continue;
+        };
+        let Some(component) = reflect_component.reflect(entity_ref) else {
+            continue;
+        };
+        let serializer = bevy::reflect::serde::TypedReflectSerializer::with_processor(
+            component, &reg, &processor,
+        );
+        if let Ok(value) = serde_json::to_value(&serializer) {
+            to_add.push((type_path, value));
+        }
+    }
+
+    drop(reg);
+
+    let promoted: Vec<String> = to_add.iter().map(|(path, _)| path.clone()).collect();
+
+    if !promoted.is_empty() {
+        let mut ast = world.resource_mut::<jackdaw_jsn::SceneJsnAst>();
+        for (type_path, value) in to_add {
+            ast.set_component(entity, &type_path, value);
+        }
+    }
+
+    promoted
 }
