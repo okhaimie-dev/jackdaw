@@ -3,6 +3,7 @@ pub(crate) mod component_display;
 mod component_picker;
 mod custom_props_display;
 mod material_display;
+pub(crate) mod physics_display;
 pub(crate) mod reflect_fields;
 
 use crate::EditorEntity;
@@ -115,6 +116,7 @@ impl Plugin for InspectorPlugin {
             .add_observer(component_picker::on_add_component_button_click)
             .add_observer(reflect_fields::on_checkbox_commit)
             .add_observer(reflect_fields::on_text_edit_commit)
+            .add_observer(physics_display::on_physics_enable_toggle)
             .add_observer(custom_props_display::on_custom_property_checkbox_commit)
             .add_observer(custom_props_display::on_custom_property_text_commit)
             .add_observer(brush_display::handle_clear_texture)
@@ -129,6 +131,7 @@ impl Plugin for InspectorPlugin {
                 Update,
                 (
                     reflect_fields::refresh_inspector_fields,
+                    reflect_fields::refresh_enum_variants,
                     component_picker::filter_component_picker,
                     brush_display::update_brush_face_properties,
                     component_display::filter_inspector_components,
@@ -222,6 +225,18 @@ pub(super) struct FieldBinding {
     pub(super) source_entity: Entity,
     pub(super) type_path: String,
     pub(super) field_path: String,
+}
+
+/// Marker on the container that holds an enum combobox + its current variant's
+/// field rows. `refresh_enum_variants` polls these and rebuilds the subtree
+/// (combobox + field rows) in place whenever the ECS variant changes.
+#[derive(Component)]
+pub(super) struct EnumVariantHost {
+    pub(super) source_entity: Entity,
+    pub(super) type_path: String,
+    pub(super) field_path: String,
+    pub(super) depth: usize,
+    pub(super) current_variant: String,
 }
 
 /// Container for brush face properties (texture, UV, etc). Populated dynamically.

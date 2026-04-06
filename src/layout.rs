@@ -78,6 +78,7 @@ pub enum EditToolButton {
     Edge,
     Face,
     Clip,
+    Physics,
 }
 
 /// Stores tooltip text for toolbar buttons (used with `Hovered` component).
@@ -359,6 +360,14 @@ fn toolbar(icon_font: Handle<Font>) -> impl Bundle {
                 f.clone(),
                 "Clip Mode (4)"
             ),
+            // Separator
+            separator::separator(separator::SeparatorProps::vertical()),
+            toolbar_edit_button(
+                Icon::Zap,
+                EditToolButton::Physics,
+                f.clone(),
+                "Physics Tool"
+            ),
             // Spacer pushes help button to the right
             (Node {
                 flex_grow: 1.0,
@@ -542,6 +551,19 @@ fn toolbar_edit_button(
                                 diagonal_snap: false,
                                 cached_face_hit: None,
                             });
+                        }
+                    }
+                    EditToolButton::Physics => {
+                        draw_state.active = None;
+                        brush_selection.entity = None;
+                        brush_selection.faces.clear();
+                        brush_selection.vertices.clear();
+                        brush_selection.edges.clear();
+                        if *edit_mode == EditMode::Physics {
+                            // Toggle off
+                            *edit_mode = EditMode::Object;
+                        } else {
+                            *edit_mode = EditMode::Physics;
                         }
                     }
                     EditToolButton::Vertex
@@ -1014,6 +1036,7 @@ pub fn update_edit_tool_highlights(
             EditToolButton::Clip => {
                 !draw_active && *edit_mode == EditMode::BrushEdit(BrushEditMode::Clip)
             }
+            EditToolButton::Physics => !draw_active && *edit_mode == EditMode::Physics,
         };
         bg.0 = if active {
             tokens::SELECTED_BG

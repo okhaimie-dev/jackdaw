@@ -100,7 +100,7 @@ pub(crate) fn on_add_component_button_click(
         // Skip editor-internal types
         let table = registration.type_info().type_path_table();
         let full_path = table.path();
-        if full_path.starts_with("jackdaw") {
+        if full_path.starts_with("jackdaw") && !full_path.starts_with("jackdaw_avian_integration") {
             continue;
         }
 
@@ -275,12 +275,12 @@ pub(crate) fn on_add_component_button_click(
                         move |_: On<Pointer<Click>>, mut commands: Commands| {
                             let tp = type_path_full.clone();
                             commands.queue(move |world: &mut World| {
-                                let cmd = crate::commands::AddComponent {
-                                    entity: source_entity,
+                                let cmd = crate::commands::AddComponent::new(
+                                    source_entity,
                                     type_id,
                                     component_id,
-                                    type_path: tp,
-                                };
+                                    tp,
+                                );
                                 let mut cmd = Box::new(cmd);
                                 cmd.execute(world);
                                 let mut history =

@@ -41,12 +41,14 @@ pub struct BrushFaceEntity {
 #[derive(Component)]
 pub struct BrushPreview;
 
-/// Edit mode: Object (default) or brush editing.
+/// Edit mode: Object (default), brush editing, or the Hammer-style physics
+/// placement tool.
 #[derive(Resource, Default, PartialEq, Eq, Clone, Copy, Debug, Reflect)]
 pub enum EditMode {
     #[default]
     Object,
     BrushEdit(BrushEditMode),
+    Physics,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Reflect)]

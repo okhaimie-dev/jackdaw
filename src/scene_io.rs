@@ -41,7 +41,7 @@ const SKIP_COMPONENT_PATHS: &[&str] = &[
     "bevy_light::cascade::Cascades",
 ];
 
-/// Paths that override the skip prefixes — these are always saved even if
+/// Paths that override the skip prefixes  -- these are always saved even if
 /// they match a skip prefix.
 const ALWAYS_SAVE_PATHS: &[&str] = &["bevy_camera::visibility::Visibility"];
 
@@ -368,7 +368,7 @@ impl<'a> ReflectSerializerProcessor for JsnSerializerProcessor<'a> {
             }
 
             if let Some(path) = untyped_handle.path() {
-                // Uncollected external asset — serialize as relative path (backward compat)
+                // Uncollected external asset  -- serialize as relative path (backward compat)
                 let rel = pathdiff::diff_paths(path.path(), &self.parent_path)
                     .unwrap_or_else(|| path.path().to_owned());
                 let mut path_str = rel.to_string_lossy().into_owned();
@@ -379,7 +379,7 @@ impl<'a> ReflectSerializerProcessor for JsnSerializerProcessor<'a> {
                 return Ok(Ok(serializer.serialize_str(&path_str)?));
             }
 
-            // Unknown handle (no path, not inline) — serialize as null
+            // Unknown handle (no path, not inline)  -- serialize as null
             return Ok(Ok(serializer.serialize_unit()?));
         }
 
@@ -434,7 +434,7 @@ impl<'a> ReflectDeserializerProcessor for JsnDeserializerProcessor<'a> {
             return Ok(Ok(Box::new(val).into_partial_reflect()));
         }
 
-        // Handle<T> — deserialize from path string or #Name
+        // Handle<T>  -- deserialize from path string or #Name
         if registration.data::<ReflectHandle>().is_some() {
             let type_info = registration.type_info();
 
@@ -463,7 +463,7 @@ impl<'a> ReflectDeserializerProcessor for JsnDeserializerProcessor<'a> {
                     return Ok(Ok(Box::new(handle.clone()).into_partial_reflect()));
                 }
                 warn!(
-                    "Catalog asset '{}' not found — using default",
+                    "Catalog asset '{}' not found  -- using default",
                     relative_path
                 );
                 if let Some(reflect_default) = registration.data::<ReflectDefault>() {
@@ -486,7 +486,7 @@ impl<'a> ReflectDeserializerProcessor for JsnDeserializerProcessor<'a> {
             return Ok(Ok(Box::new(handle).into_partial_reflect()));
         }
 
-        // Entity — deserialize from scene-local index
+        // Entity  -- deserialize from scene-local index
         if registration.type_id() == TypeId::of::<Entity>() {
             let idx_str = match deserializer.deserialize_u64(&*self) {
                 Ok(s) => s,
@@ -708,12 +708,12 @@ fn collect_handles_from_reflect(
             .downcast_handle_untyped(value.as_any())
             .expect("This must have been a handle");
 
-        // Already collected — skip
+        // Already collected  -- skip
         if id_to_name.contains_key(&untyped_handle.id()) {
             return;
         }
 
-        // Check catalog first — if this handle is a catalog asset with an @Name,
+        // Check catalog first  -- if this handle is a catalog asset with an @Name,
         // emit @Name and don't inline it into the scene's asset table.
         // Skip #-prefixed entries (internal catalog references like #Image8)
         // because those are only meaningful inside the catalog, not in scenes.
@@ -724,7 +724,7 @@ fn collect_handles_from_reflect(
             }
         }
 
-        // External file-backed resource — store as a path string entry
+        // External file-backed resource  -- store as a path string entry
         if let Some(asset_path) = untyped_handle.path() {
             let asset_type_id = reflect_handle.asset_type_id();
             let Some(asset_registration) = registry.get(asset_type_id) else {
@@ -1053,7 +1053,7 @@ fn build_scene_snapshot(
         entity_to_index: &entity_to_index,
     };
 
-    // Component types to skip — only computed/internal components
+    // Component types to skip  -- only computed/internal components
     let skip_ids: HashSet<TypeId> = HashSet::from([
         TypeId::of::<GlobalTransform>(),
         TypeId::of::<InheritedVisibility>(),
@@ -1061,6 +1061,8 @@ fn build_scene_snapshot(
         TypeId::of::<ChildOf>(),
         TypeId::of::<Children>(),
     ]);
+
+    let ast = world.resource::<jackdaw_jsn::SceneJsnAst>();
 
     entities
         .iter()
@@ -1071,8 +1073,16 @@ fn build_scene_snapshot(
                 .get::<ChildOf>()
                 .and_then(|c| entity_to_index.get(&c.parent()).copied());
 
+            // Derived components for this entity  -- skip them during save
+            let derived = ast
+                .node_for_entity(entity)
+                .map(|n| &n.derived_components)
+                .cloned()
+                .unwrap_or_default();
+
             // All components (including Name, Transform, Visibility) via reflection
             let mut components = HashMap::new();
+            let mut skipped_derived = 0u32;
 
             for registration in registry.iter() {
                 if skip_ids.contains(&registration.type_id()) {
@@ -1085,6 +1095,13 @@ fn build_scene_snapshot(
                     continue;
                 }
 
+                // Skip derived (auto-added via #[require]) components  --
+                // they contain stale runtime state and are recreated fresh.
+                if derived.contains(type_path) {
+                    skipped_derived += 1;
+                    continue;
+                }
+
                 let Some(reflect_component) = registration.data::<ReflectComponent>() else {
                     continue;
                 };
@@ -1092,12 +1109,18 @@ fn build_scene_snapshot(
                     continue;
                 };
 
-                // Serialize with processor — handles Handle<T> → path and Entity → index
+                // Serialize with processor  -- handles Handle<T> → path and Entity → index
                 let serializer =
                     TypedReflectSerializer::with_processor(component, registry, &ser_processor);
                 if let Ok(value) = serde_json::to_value(&serializer) {
                     components.insert(type_path.to_string(), value);
                 }
+            }
+
+            if skipped_derived > 0 {
+                info!(
+                    "Scene save: entity {entity}  -- skipped {skipped_derived} derived components"
+                );
             }
 
             JsnEntity { parent, components }
@@ -1280,7 +1303,7 @@ pub fn load_inline_assets(
                 }
             } else {
                 warn!(
-                    "External asset entry '{name}' has unknown type '{type_path}' — loading untyped"
+                    "External asset entry '{name}' has unknown type '{type_path}'  -- loading untyped"
                 );
                 asset_server
                     .load::<bevy::asset::LoadedUntypedAsset>(&path_str)
@@ -1293,11 +1316,11 @@ pub fn load_inline_assets(
     // Second pass: deserialize all object-value entries (inline assets like materials)
     for (type_path, named_entries) in &assets.0 {
         let Some(registration) = registry_guard.get_with_type_path(type_path) else {
-            warn!("Unknown asset type '{type_path}' in inline assets — skipping");
+            warn!("Unknown asset type '{type_path}' in inline assets  -- skipping");
             continue;
         };
         let Some(reflect_asset) = registration.data::<ReflectAsset>() else {
-            warn!("Type '{type_path}' has no ReflectAsset — skipping");
+            warn!("Type '{type_path}' has no ReflectAsset  -- skipping");
             continue;
         };
 
@@ -1371,11 +1394,11 @@ pub fn load_scene_from_jsn(
     for (i, jsn) in entities.iter().enumerate() {
         for (type_path, value) in &jsn.components {
             let Some(registration) = registry_guard.get_with_type_path(type_path) else {
-                warn!("Unknown type '{type_path}' — skipping");
+                warn!("Unknown type '{type_path}'  -- skipping");
                 continue;
             };
             let Some(reflect_component) = registration.data::<ReflectComponent>() else {
-                warn!("Type '{type_path}' has no ReflectComponent — skipping");
+                warn!("Type '{type_path}' has no ReflectComponent  -- skipping");
                 continue;
             };
 
@@ -1392,7 +1415,7 @@ pub fn load_scene_from_jsn(
                 &mut deser_processor,
             );
             let Ok(reflected) = deserializer.deserialize(value) else {
-                warn!("Failed to deserialize '{type_path}' — skipping");
+                warn!("Failed to deserialize '{type_path}'  -- skipping");
                 continue;
             };
 
@@ -1404,7 +1427,7 @@ pub fn load_scene_from_jsn(
                 );
             }));
             if result.is_err() {
-                warn!("Panic while inserting component '{type_path}' — skipping");
+                warn!("Panic while inserting component '{type_path}'  -- skipping");
             }
         }
     }
@@ -1583,7 +1606,7 @@ pub(crate) fn clear_scene_entities(world: &mut World) {
     // Clear hierarchy tree rows and TreeIndex before despawning scene entities.
     crate::hierarchy::clear_all_tree_rows(world);
 
-    // Clear undo/redo stacks — they hold entity references that become stale.
+    // Clear undo/redo stacks  -- they hold entity references that become stale.
     let mut history = world.resource_mut::<jackdaw_commands::CommandHistory>();
     history.undo_stack.clear();
     history.redo_stack.clear();
@@ -1616,7 +1639,7 @@ pub(crate) fn clear_scene_entities(world: &mut World) {
     }
 }
 
-/// ISO 8601 timestamp (simplified — no chrono dependency).
+/// ISO 8601 timestamp (simplified  -- no chrono dependency).
 fn chrono_now() -> String {
     let since_epoch = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1722,7 +1745,7 @@ fn handle_scene_io_keys(world: &mut World) {
 
 /// Register a single ECS entity in the SceneJsnAst by serializing all its
 /// scene-relevant components into JSON. Skips entities already in the AST.
-/// Serializer processor for AST registration — resolves `Handle<T>` to path strings
+/// Serializer processor for AST registration  -- resolves `Handle<T>` to path strings
 /// and `Entity` to null (no scene-local index available at registration time).
 /// Matches BSN's `BsnValue::from_reflect_with_assets` pattern.
 pub struct AstSerializerProcessor;
@@ -1752,7 +1775,7 @@ impl ReflectSerializerProcessor for AstSerializerProcessor {
                 let path_str = path.path().to_string_lossy().into_owned();
                 return Ok(Ok(serializer.serialize_str(&path_str)?));
             }
-            // Default or runtime handle — serialize as null
+            // Default or runtime handle  -- serialize as null
             return Ok(Ok(serializer.serialize_unit()?));
         }
 
