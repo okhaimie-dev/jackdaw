@@ -217,8 +217,12 @@ fn physics_tool_drag(
     }
 
     let Ok(window) = windows.single() else { return };
-    let Some(cursor_pos) = window.cursor_position() else { return };
-    let Ok((camera, cam_tf)) = camera_query.single() else { return };
+    let Some(cursor_pos) = window.cursor_position() else {
+        return;
+    };
+    let Ok((camera, cam_tf)) = camera_query.single() else {
+        return;
+    };
 
     let Some(viewport_cursor) =
         crate::viewport_util::window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
@@ -226,7 +230,9 @@ fn physics_tool_drag(
         return;
     };
 
-    let Ok(ray) = camera.viewport_to_world(cam_tf, viewport_cursor) else { return };
+    let Ok(ray) = camera.viewport_to_world(cam_tf, viewport_cursor) else {
+        return;
+    };
 
     // --- Start drag ---
     if mouse.just_pressed(MouseButton::Left) && tool_state.drag.is_none() {
