@@ -1118,24 +1118,28 @@ pub fn asset_browser_panel(icon_font: Handle<Font>) -> impl Bundle {
             height: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
             padding: UiRect::all(Val::Px(tokens::SPACING_SM)),
+            border_radius: BorderRadius::all(Val::Px(tokens::BORDER_RADIUS_LG)),
+            overflow: Overflow::clip(),
             ..Default::default()
         },
         BackgroundColor(tokens::PANEL_BG),
         children![
-            // Root directory header
+            // Breadcrumb bar with path + search on right
             (
                 Node {
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::SpaceBetween,
                     width: Val::Percent(100.0),
-                    height: Val::Px(tokens::ROW_HEIGHT),
-                    padding: UiRect::horizontal(Val::Px(tokens::SPACING_MD)),
+                    height: Val::Px(34.0),
+                    padding: UiRect::axes(Val::Px(tokens::SPACING_MD), Val::Px(tokens::SPACING_SM)),
                     flex_shrink: 0.0,
+                    border: UiRect::top(Val::Px(1.0)),
                     ..Default::default()
                 },
-                BackgroundColor(tokens::PANEL_HEADER_BG),
+                BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.1)),
                 children![
+                    // Left: breadcrumb path + root label + folder button
                     (
                         Node {
                             flex_direction: FlexDirection::Row,
@@ -1147,12 +1151,13 @@ pub fn asset_browser_panel(icon_font: Handle<Font>) -> impl Bundle {
                         },
                         children![
                             (
-                                Text::new("Assets"),
-                                TextFont {
-                                    font_size: tokens::FONT_MD,
+                                AssetBrowserBreadcrumb,
+                                EditorEntity,
+                                Node {
+                                    flex_direction: FlexDirection::Row,
+                                    align_items: AlignItems::Center,
                                     ..Default::default()
                                 },
-                                ThemedText,
                             ),
                             (
                                 AssetBrowserRootLabel,
@@ -1161,27 +1166,13 @@ pub fn asset_browser_panel(icon_font: Handle<Font>) -> impl Bundle {
                                     font_size: tokens::FONT_SM,
                                     ..Default::default()
                                 },
-                                TextColor(tokens::TEXT_SECONDARY),
+                                TextColor(tokens::TEXT_TERTIARY),
                             ),
                         ],
                     ),
+                    // Right: folder button
                     asset_folder_button(folder_icon_font),
                 ],
-            ),
-            // Breadcrumb bar
-            (
-                AssetBrowserBreadcrumb,
-                EditorEntity,
-                Node {
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    padding: UiRect::axes(Val::Px(tokens::SPACING_MD), Val::Px(tokens::SPACING_SM)),
-                    width: Val::Percent(100.0),
-                    height: Val::Px(tokens::HEADER_HEIGHT),
-                    flex_shrink: 0.0,
-                    ..Default::default()
-                },
-                BackgroundColor(tokens::TOOLBAR_BG),
             ),
             // Main row: content grid + preview panel
             (

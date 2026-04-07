@@ -101,7 +101,7 @@ pub(crate) fn build_inspector_displays(
     names: &Query<&Name>,
     icon_font: &IconFont,
     editor_font: &EditorFont,
-    read_only: bool,
+    _read_only: bool,
     materials: &Assets<StandardMaterial>,
     jsn_type_paths: &HashSet<String>,
 ) {
@@ -337,13 +337,12 @@ pub(crate) fn build_inspector_displays(
                         align_items: AlignItems::Center,
                         width: Val::Percent(100.0),
                         padding: UiRect::axes(
-                            Val::Px(tokens::SPACING_SM),
+                            Val::Px(tokens::SPACING_XS),
                             Val::Px(tokens::SPACING_SM),
                         ),
                         column_gap: Val::Px(tokens::SPACING_SM),
                         ..Default::default()
                     },
-                    BackgroundColor(tokens::PANEL_BG),
                     ChildOf(section),
                 ))
                 .id();
@@ -394,11 +393,9 @@ pub(crate) fn build_inspector_displays(
                     Node {
                         flex_direction: FlexDirection::Column,
                         width: Val::Percent(100.0),
-                        border: UiRect::left(Val::Px(1.0)),
-                        margin: UiRect::left(Val::Px(tokens::SPACING_MD)),
+                        row_gap: Val::Px(tokens::SPACING_SM),
                         ..Default::default()
                     },
-                    BorderColor::all(tokens::BORDER_SUBTLE),
                     ChildOf(section),
                 ))
                 .id();
@@ -528,15 +525,8 @@ pub(crate) fn build_inspector_displays(
         ));
     }
 
-    if !read_only {
-        commands.spawn((
-            AddComponentButton,
-            jackdaw_feathers::button::button(jackdaw_feathers::button::ButtonProps::new(
-                "+ Add Component",
-            )),
-            ChildOf(inspector_entity),
-        ));
-    }
+    // Add Component button is in the static layout header (layout.rs entity_inspector)
+    // so we don't spawn a dynamic one here.
 }
 
 pub(crate) fn remove_component_displays(
@@ -678,8 +668,19 @@ pub(crate) fn spawn_component_display(
             Node {
                 flex_direction: FlexDirection::Column,
                 width: Val::Percent(100.0),
+                border: UiRect::all(Val::Px(1.0)),
+                border_radius: BorderRadius::all(Val::Px(tokens::COMPONENT_CARD_RADIUS)),
                 ..Default::default()
             },
+            BackgroundColor(tokens::COMPONENT_CARD_BG),
+            BorderColor::all(tokens::COMPONENT_CARD_BORDER),
+            BoxShadow(vec![ShadowStyle {
+                x_offset: Val::ZERO,
+                y_offset: Val::ZERO,
+                blur_radius: Val::Px(1.0),
+                spread_radius: Val::ZERO,
+                color: Color::srgba(0.0, 0.0, 0.0, 0.88),
+            }]),
         ))
         .id();
 
@@ -691,11 +692,12 @@ pub(crate) fn spawn_component_display(
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 width: Val::Percent(100.0),
-                padding: UiRect::axes(Val::Px(tokens::SPACING_SM), Val::Px(tokens::SPACING_XS)),
+                padding: UiRect::axes(Val::Px(tokens::SPACING_MD), Val::Px(tokens::SPACING_SM)),
                 column_gap: Val::Px(tokens::SPACING_SM),
+                border_radius: BorderRadius::top(Val::Px(tokens::COMPONENT_CARD_RADIUS)),
                 ..Default::default()
             },
-            BackgroundColor(tokens::PANEL_HEADER_BG),
+            BackgroundColor(tokens::COMPONENT_CARD_HEADER_BG),
             ChildOf(section_entity),
         ))
         .id();
@@ -777,7 +779,7 @@ pub(crate) fn spawn_component_display(
         commands.spawn((
             Text::new(String::from(Icon::X.unicode())),
             TextFont {
-                font,
+                font: font.clone(),
                 font_size: tokens::FONT_SM,
                 ..Default::default()
             },
@@ -788,6 +790,18 @@ pub(crate) fn spawn_component_display(
             }),
         ));
     }
+
+    // Ellipsis menu icon
+    commands.spawn((
+        Text::new(String::from(Icon::Ellipsis.unicode())),
+        TextFont {
+            font: font.clone(),
+            font_size: tokens::FONT_SM,
+            ..Default::default()
+        },
+        TextColor(tokens::TEXT_SECONDARY),
+        ChildOf(header),
+    ));
 
     // Hover effect on header
     commands.entity(header).observe(
@@ -800,7 +814,7 @@ pub(crate) fn spawn_component_display(
     commands.entity(header).observe(
         |out: On<Pointer<Out>>, mut bg: Query<&mut BackgroundColor, With<CollapsibleHeader>>| {
             if let Ok(mut bg) = bg.get_mut(out.event_target()) {
-                bg.0 = tokens::PANEL_HEADER_BG;
+                bg.0 = tokens::COMPONENT_CARD_HEADER_BG;
             }
         },
     );

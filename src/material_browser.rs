@@ -1472,6 +1472,8 @@ pub fn material_browser_panel(icon_font: Handle<Font>) -> impl Bundle {
             width: Val::Percent(100.0),
             height: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
+            border_radius: BorderRadius::all(Val::Px(tokens::BORDER_RADIUS_LG)),
+            overflow: Overflow::clip(),
             ..Default::default()
         },
         BackgroundColor(tokens::PANEL_BG),

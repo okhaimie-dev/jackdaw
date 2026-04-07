@@ -132,7 +132,7 @@ pub fn menu_bar_shell() -> impl Bundle {
             padding: UiRect::horizontal(Val::Px(tokens::SPACING_SM)),
             ..Default::default()
         },
-        BackgroundColor(tokens::TOOLBAR_BG),
+        BackgroundColor(tokens::WINDOW_BG),
     )
 }
 

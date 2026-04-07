@@ -15,7 +15,6 @@ pub const ROW_BG: Color = Color::NONE;
 const INDENT_WIDTH: f32 = 16.0;
 const TOGGLE_WIDTH: f32 = 18.0;
 const DOT_COLUMN_WIDTH: f32 = 14.0;
-const DOT_SIZE: f32 = 8.0;
 
 /// Parameters for tree row icon font rendering
 #[derive(Clone)]
@@ -155,8 +154,8 @@ fn tree_row_content(
         children![
             // Expand toggle (chevron)
             expand_toggle(has_children, &style.icon_font),
-            // Category dot
-            category_dot(category),
+            // Category icon
+            category_dot(category, &style.icon_font),
             // Label
             (
                 TreeRowLabel,
@@ -395,9 +394,16 @@ fn visibility_toggle(source: Entity, icon_font: &Handle<Font>) -> impl Bundle {
     )
 }
 
-/// Colored dot indicating entity category.
-fn category_dot(category: EntityCategory) -> impl Bundle {
+/// Icon indicating entity category (matches Figma reference).
+fn category_dot(category: EntityCategory, icon_font: &Handle<Font>) -> impl Bundle {
     let color = category_color(category);
+    let icon_char = match category {
+        EntityCategory::Camera => Icon::Video,
+        EntityCategory::Light => Icon::Lightbulb,
+        EntityCategory::Mesh => Icon::Box,
+        EntityCategory::Scene => Icon::Box,
+        EntityCategory::Entity => Icon::Dot,
+    };
     (
         TreeRowDot,
         Node {
@@ -408,13 +414,13 @@ fn category_dot(category: EntityCategory) -> impl Bundle {
             ..default()
         },
         children![(
-            Node {
-                width: px(DOT_SIZE),
-                height: px(DOT_SIZE),
-                border_radius: BorderRadius::all(px(DOT_SIZE / 2.0)),
+            Text::new(String::from(icon_char.unicode())),
+            TextFont {
+                font: icon_font.clone(),
+                font_size: 12.0,
                 ..default()
             },
-            BackgroundColor(color),
+            TextColor(color),
         )],
     )
 }

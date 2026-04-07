@@ -40,7 +40,7 @@ pub(super) fn spawn_physics_section(
     let has_collider = entity_ref.contains::<AvianCollider>();
     let is_enabled = has_rb || has_collider;
 
-    // Collapsible section
+    // Collapsible section — card styling
     let section = commands
         .spawn((
             super::ComponentDisplay,
@@ -48,13 +48,24 @@ pub(super) fn spawn_physics_section(
             Node {
                 flex_direction: FlexDirection::Column,
                 width: Val::Percent(100.0),
+                border: UiRect::all(Val::Px(1.0)),
+                border_radius: BorderRadius::all(Val::Px(tokens::COMPONENT_CARD_RADIUS)),
                 ..Default::default()
             },
+            BackgroundColor(tokens::COMPONENT_CARD_BG),
+            BorderColor::all(tokens::COMPONENT_CARD_BORDER),
+            BoxShadow(vec![ShadowStyle {
+                x_offset: Val::ZERO,
+                y_offset: Val::ZERO,
+                blur_radius: Val::Px(1.0),
+                spread_radius: Val::ZERO,
+                color: Color::srgba(0.0, 0.0, 0.0, 0.88),
+            }]),
             ChildOf(inspector_entity),
         ))
         .id();
 
-    // Header
+    // Header — card header styling
     let header = commands
         .spawn((
             CollapsibleHeader,
@@ -64,9 +75,10 @@ pub(super) fn spawn_physics_section(
                 column_gap: Val::Px(tokens::SPACING_SM),
                 padding: UiRect::axes(Val::Px(tokens::SPACING_MD), Val::Px(tokens::SPACING_SM)),
                 width: Val::Percent(100.0),
+                border_radius: BorderRadius::top(Val::Px(tokens::COMPONENT_CARD_RADIUS)),
                 ..Default::default()
             },
-            BackgroundColor(tokens::PANEL_BG),
+            BackgroundColor(tokens::COMPONENT_CARD_HEADER_BG),
             ChildOf(section),
         ))
         .id();

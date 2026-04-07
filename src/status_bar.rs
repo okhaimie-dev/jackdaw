@@ -12,10 +12,21 @@ use crate::{
     snapping::SnapSettings,
 };
 
+/// Git branch + short commit hash, read once at startup.
+#[derive(Resource, Default)]
+pub struct GitInfo {
+    pub display: String,
+}
+
 pub struct StatusBarPlugin;
 
 impl Plugin for StatusBarPlugin {
     fn build(&self, app: &mut App) {
+        // Read git info once at startup
+        let git_display = read_git_info();
+        app.insert_resource(GitInfo {
+            display: git_display,
+        });
         app.add_systems(
             Update,
             (
@@ -28,20 +39,49 @@ impl Plugin for StatusBarPlugin {
     }
 }
 
+fn read_git_info() -> String {
+    let branch = std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+    let hash = std::process::Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+    if branch.is_empty() {
+        String::new()
+    } else {
+        format!("{branch} ({hash})")
+    }
+}
+
 fn update_status_left(
     selection: Res<Selection>,
     selected: Query<Option<&Name>, With<Selected>>,
     transforms: Query<&Transform>,
+    git_info: Res<GitInfo>,
     mut text_query: Query<&mut Text, With<StatusBarLeft>>,
 ) {
     let Ok(mut text) = text_query.single_mut() else {
         return;
     };
 
+    let git_prefix = if git_info.display.is_empty() {
+        String::new()
+    } else {
+        format!("{} | ", git_info.display)
+    };
+
     let count = selection.entities.len();
     if count == 0 {
         if selection.is_changed() {
-            text.0 = "No selection".to_string();
+            text.0 = format!("{git_prefix}No selection");
         }
     } else if count == 1 {
         if let Some(primary) = selection.primary() {
@@ -55,16 +95,16 @@ fn update_status_left(
                 .get(primary)
                 .map(|t| {
                     let p = t.translation;
-                    format!("  Pos: ({:.2}, {:.2}, {:.2})", p.x, p.y, p.z)
+                    format!("  ({:.1}, {:.1}, {:.1})", p.x, p.y, p.z)
                 })
                 .unwrap_or_default();
-            let new_text = format!("{name}{pos_str}");
+            let new_text = format!("{git_prefix}{name}{pos_str}");
             if text.0 != new_text {
                 text.0 = new_text;
             }
         }
     } else if selection.is_changed() {
-        text.0 = format!("{count} entities selected");
+        text.0 = format!("{git_prefix}{count} entities");
     }
 }
 
@@ -96,8 +136,9 @@ fn update_status_center(
         point_lights.iter().count() + dir_lights.iter().count() + spot_lights.iter().count();
     let camera_count = cameras.iter().count();
 
+    let version = env!("CARGO_PKG_VERSION");
     let new_text = format!(
-        "Entities: {total}  |  Meshes: {mesh_count}  |  Lights: {light_count}  |  Cameras: {camera_count}"
+        "Jackdaw v{version}  |  Entities: {total}  |  Meshes: {mesh_count}  |  Lights: {light_count}  |  Cameras: {camera_count}"
     );
     if text.0 != new_text {
         text.0 = new_text;

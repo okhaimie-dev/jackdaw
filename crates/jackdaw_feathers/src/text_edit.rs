@@ -80,7 +80,12 @@ impl TextEditVariant {
 
 #[derive(Clone)]
 pub enum TextEditPrefix {
-    Label { label: String, size: f32 },
+    Label {
+        label: String,
+        size: f32,
+        /// Optional accent color shown as a 2px left border on the label.
+        color: Option<Color>,
+    },
 }
 
 #[derive(Component)]
@@ -211,6 +216,7 @@ impl TextEditProps {
         self.prefix = Some(TextEditPrefix::Label {
             label: "↔".to_string(),
             size: TEXT_SIZE,
+            color: None,
         });
         self.min = f32::MIN as f64;
         self.max = f32::MAX as f64;
@@ -222,6 +228,7 @@ impl TextEditProps {
         self.prefix = Some(TextEditPrefix::Label {
             label: "↔".to_string(),
             size: TEXT_SIZE,
+            color: None,
         });
         self.min = i32::MIN as f64;
         self.max = i32::MAX as f64;
@@ -353,22 +360,44 @@ fn setup_text_edit_input(
 
         if let Some(ref prefix) = config.prefix {
             let prefix_entity = match prefix {
-                TextEditPrefix::Label { label, size } => commands
-                    .spawn((
-                        Text::new(label),
-                        TextFont {
-                            font: font.clone(),
-                            font_size: *size,
-                            ..default()
-                        },
-                        TextColor(TEXT_BODY_COLOR.with_alpha(0.5).into()),
-                        TextLayout::new_with_justify(Justify::Center),
-                        Node {
-                            width: px(AFFIX_SIZE),
-                            ..default()
-                        },
-                    ))
-                    .id(),
+                TextEditPrefix::Label {
+                    label,
+                    size,
+                    color,
+                } => {
+                    let prefix_id = commands
+                        .spawn((
+                            Text::new(label),
+                            TextFont {
+                                font: font.clone(),
+                                font_size: *size,
+                                ..default()
+                            },
+                            TextColor(TEXT_BODY_COLOR.with_alpha(0.5).into()),
+                            TextLayout::new_with_justify(Justify::Center),
+                            Node {
+                                width: px(AFFIX_SIZE),
+                                border: if color.is_some() {
+                                    UiRect::left(px(2))
+                                } else {
+                                    UiRect::default()
+                                },
+                                padding: if color.is_some() {
+                                    UiRect::left(px(2))
+                                } else {
+                                    UiRect::default()
+                                },
+                                ..default()
+                            },
+                        ))
+                        .id();
+                    if let Some(c) = color {
+                        commands
+                            .entity(prefix_id)
+                            .insert(BorderColor::all(*c));
+                    }
+                    prefix_id
+                }
             };
             commands.entity(wrapper_entity).add_child(prefix_entity);
         }
