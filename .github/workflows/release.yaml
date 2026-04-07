@@ -51,6 +51,7 @@ jobs:
             jackdaw_jsn
             jackdaw_feathers
             jackdaw_bsn
+            jackdaw_avian_integration
             jackdaw_remote
           )
 
