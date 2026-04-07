@@ -220,29 +220,50 @@ pub(crate) fn build_inspector_displays(
     // Spawn components with subtle group dividers
     let mut current_group = String::new();
     for (name, module_group, component_id) in &comp_list {
-        // Small text divider when group changes
+        // Category group divider with icon
         if *module_group != current_group {
             current_group = module_group.clone();
+            let group_icon = if custom_groups.contains(module_group) {
+                Icon::Tag
+            } else {
+                Icon::Package
+            };
             commands.spawn((
                 ComponentDisplay,
-                Text::new(module_group.clone()),
-                TextFont {
-                    font: editor_font.0.clone(),
-                    font_size: tokens::FONT_SM,
-                    weight: FontWeight::MEDIUM,
-                    ..Default::default()
-                },
-                TextColor(tokens::TEXT_SECONDARY),
                 Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(tokens::SPACING_SM),
                     padding: UiRect::new(
                         Val::Px(tokens::SPACING_XS),
                         Val::ZERO,
-                        Val::Px(tokens::SPACING_SM),
+                        Val::Px(tokens::SPACING_MD),
                         Val::ZERO,
                     ),
                     ..Default::default()
                 },
                 ChildOf(inspector_entity),
+                children![
+                    (
+                        Text::new(String::from(group_icon.unicode())),
+                        TextFont {
+                            font: icon_font.0.clone(),
+                            font_size: 13.0,
+                            ..Default::default()
+                        },
+                        TextColor(tokens::TEXT_SECONDARY),
+                    ),
+                    (
+                        Text::new(module_group.clone()),
+                        TextFont {
+                            font: editor_font.0.clone(),
+                            font_size: tokens::FONT_SM,
+                            weight: FontWeight::MEDIUM,
+                            ..Default::default()
+                        },
+                        TextColor(tokens::TEXT_SECONDARY),
+                    ),
+                ],
             ));
         }
 
@@ -529,13 +550,14 @@ pub(crate) fn spawn_component_display(
         ))
         .id();
 
-    // Header
+    // Header — Figma: space-between with [chevron] [icon+name] [ellipsis]
     let header = commands
         .spawn((
             CollapsibleHeader,
             Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
+                justify_content: JustifyContent::SpaceBetween,
                 width: Val::Percent(100.0),
                 padding: UiRect::axes(Val::Px(tokens::SPACING_MD), Val::Px(tokens::SPACING_SM)),
                 column_gap: Val::Px(tokens::SPACING_SM),
@@ -547,7 +569,7 @@ pub(crate) fn spawn_component_display(
         ))
         .id();
 
-    // Toggle area (chevron + title) -- click to collapse/expand
+    // Toggle area (chevron + icon + title) -- click to collapse/expand
     let toggle_area = commands
         .spawn((
             Node {
@@ -567,6 +589,18 @@ pub(crate) fn spawn_component_display(
         TextFont {
             font: font.clone(),
             font_size: tokens::FONT_SM,
+            ..Default::default()
+        },
+        TextColor(tokens::TEXT_SECONDARY),
+        ChildOf(toggle_area),
+    ));
+
+    // Component icon (matching Figma: lucide/move-3d style icon)
+    commands.spawn((
+        Text::new(String::from(Icon::Move3d.unicode())),
+        TextFont {
+            font: font.clone(),
+            font_size: 13.0,
             ..Default::default()
         },
         TextColor(tokens::TEXT_SECONDARY),

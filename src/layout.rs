@@ -1145,7 +1145,7 @@ fn entity_heiarchy(icon_font: Handle<Font>) -> impl Bundle {
                         BackgroundColor(Color::NONE),
                         tree_container_drop_observers(),
                     ),
-                    // Scene stats footer
+                    // Scene stats footer (center-justified)
                     (
                         crate::status_bar::SceneStatsText,
                         Text::new(""),
@@ -1154,9 +1154,11 @@ fn entity_heiarchy(icon_font: Handle<Font>) -> impl Bundle {
                             ..Default::default()
                         },
                         TextColor(tokens::TEXT_SECONDARY),
+                        TextLayout::new_with_justify(Justify::Center),
                         Node {
                             padding: UiRect::all(px(tokens::SPACING_XS)),
                             flex_shrink: 0.0,
+                            width: percent(100),
                             ..Default::default()
                         },
                     )
@@ -1393,29 +1395,7 @@ pub fn update_tab_highlights(
 }
 
 fn bottom_panels(icon_font: Handle<Font>) -> impl Bundle {
-    (
-        EditorEntity,
-        Node {
-            width: percent(100),
-            height: percent(100),
-            ..Default::default()
-        },
-        // Horizontal split: asset browser | material browser
-        split_panel::panel_group(
-            0.15,
-            (
-                Spawn((
-                    split_panel::panel(2),
-                    asset_browser::asset_browser_panel(icon_font.clone()),
-                )),
-                Spawn(split_panel::panel_handle()),
-                Spawn((
-                    split_panel::panel(1),
-                    material_browser::material_browser_panel(icon_font),
-                )),
-            ),
-        ),
-    )
+    asset_browser::asset_browser_panel(icon_font)
 }
 
 /// Custom status bar that wraps the feathers status bar sections and adds
@@ -1493,6 +1473,7 @@ fn entity_inspector(icon_font: Handle<Font>) -> impl Bundle {
             panel_header::panel_tab_bar(
                 &[
                     panel_header::TabDef::new("Components", true),
+                    panel_header::TabDef::new("Materials", false),
                     panel_header::TabDef::new("Resources", false),
                     panel_header::TabDef::new("Systems", false),
                 ],
@@ -1608,9 +1589,21 @@ fn entity_inspector(icon_font: Handle<Font>) -> impl Bundle {
                     ),
                 ],
             ),
-            // Tab 1: Resources placeholder
+            // Tab 1: Materials browser (wrapped so PanelTabContent controls visibility)
             (
                 panel_header::PanelTabContent(1),
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    flex_grow: 1.0,
+                    min_height: px(0.0),
+                    display: Display::None,
+                    ..Default::default()
+                },
+                children![material_browser::material_browser_panel(icon_font)],
+            ),
+            // Tab 2: Resources placeholder
+            (
+                panel_header::PanelTabContent(2),
                 Node {
                     flex_direction: FlexDirection::Column,
                     flex_grow: 1.0,
@@ -1630,9 +1623,9 @@ fn entity_inspector(icon_font: Handle<Font>) -> impl Bundle {
                     TextColor(tokens::TEXT_SECONDARY),
                 )],
             ),
-            // Tab 2: Systems placeholder
+            // Tab 3: Systems placeholder
             (
-                panel_header::PanelTabContent(2),
+                panel_header::PanelTabContent(3),
                 Node {
                     flex_direction: FlexDirection::Column,
                     flex_grow: 1.0,
