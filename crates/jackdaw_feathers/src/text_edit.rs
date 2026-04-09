@@ -25,10 +25,9 @@ pub fn plugin(app: &mut App) {
             (
                 handle_focus_style,
                 handle_numeric_increment,
-                handle_unfocus,
+                (handle_unfocus, handle_clamp_on_unfocus).chain(),
                 handle_drag_value,
                 handle_click_to_focus,
-                handle_clamp_on_unfocus,
                 sync_text_edit_values,
             ),
         )
@@ -623,16 +622,15 @@ fn handle_click_to_focus(
 
 fn handle_unfocus(
     mut focus: ResMut<InputFocus>,
-    mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    text_edits: Query<(&ChildOf, &TextInputBuffer, Option<&TextEditSuffix>), With<EditorTextEdit>>,
+    text_edits: Query<&ChildOf, With<EditorTextEdit>>,
     wrappers: Query<&Interaction, With<TextEditWrapper>>,
 ) {
     let Some(focused_entity) = focus.0 else {
         return;
     };
-    let Ok((child_of, buffer, suffix)) = text_edits.get(focused_entity) else {
+    let Ok(child_of) = text_edits.get(focused_entity) else {
         return;
     };
     let Ok(interaction) = wrappers.get(child_of.parent()) else {
@@ -641,20 +639,11 @@ fn handle_unfocus(
 
     let clicked_outside =
         mouse.get_just_pressed().next().is_some() && *interaction == Interaction::None;
-    let enter_pressed =
-        keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::NumpadEnter);
-    let key_dismiss = keyboard.just_pressed(KeyCode::Escape) || enter_pressed;
+    let key_dismiss = keyboard.just_pressed(KeyCode::Escape)
+        || keyboard.just_pressed(KeyCode::Enter)
+        || keyboard.just_pressed(KeyCode::NumpadEnter);
 
     if clicked_outside || key_dismiss {
-        // On Enter, emit the commit event NOW before the text input plugin
-        // can process the submit and potentially clear the buffer.
-        if enter_pressed {
-            let text = strip_suffix(&buffer.get_text(), suffix);
-            commands.trigger(TextEditCommitEvent {
-                entity: focused_entity,
-                text,
-            });
-        }
         focus.0 = None;
     }
 }

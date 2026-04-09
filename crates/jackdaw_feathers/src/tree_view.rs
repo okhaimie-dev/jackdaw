@@ -505,7 +505,13 @@ pub fn tree_keyboard_navigation(
     node_query: Query<&Node>,
     mut commands: Commands,
     tree_node_query: Query<&TreeNode>,
+    input_focus: Res<bevy::input_focus::InputFocus>,
 ) {
+    // Skip tree keyboard navigation when a text input is focused
+    // to avoid Enter/arrow keys interfering with text editing.
+    if input_focus.0.is_some() {
+        return;
+    }
     // Collect all visible tree rows in order
     let visible_rows =
         collect_visible_rows(&tree_view, &tree_nodes, &tree_row_children, &node_query);
