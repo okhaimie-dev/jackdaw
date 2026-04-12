@@ -1,9 +1,8 @@
 //! Editor commands for node-graph mutations.
 //!
-//! Every interactive mutation from Phase 2 routes through one of these
-//! commands so the [`CommandHistory`] from `jackdaw_commands` can undo/redo
-//! it. Commands mutate the data layer (`GraphNode`, `Connection`, terminal
-//! children); UI entities are kept in sync by systems in [`sync`](crate::sync).
+//! Every interactive mutation routes through one of these commands so
+//! `jackdaw_commands::CommandHistory` can undo/redo it. Commands mutate
+//! the data layer; UI is kept in sync by systems in `crate::sync`.
 
 use bevy::prelude::*;
 use jackdaw_commands::EditorCommand;
