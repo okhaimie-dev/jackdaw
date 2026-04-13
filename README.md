@@ -14,9 +14,13 @@ We have also recently refactored our UX/UI to be _very_ similar to the official 
 
 
 From bevy_editor_prototypes repo:
+
 [Bevy Editor Vision](https://bevyengine.github.io/bevy_editor_prototypes/vision.html)
+
 [Bevy Editor Architecture](https://bevyengine.github.io/bevy_editor_prototypes/architecture.html)
+
 [Bevy Editor Roadmap](https://bevyengine.github.io/bevy_editor_prototypes/roadmap.html)
+
 
 <img width="1899" height="1014" alt="image" src="https://github.com/user-attachments/assets/3a6611b3-0974-42dc-af78-a6087c222c4d" />
 
