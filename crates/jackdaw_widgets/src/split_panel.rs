@@ -85,9 +85,13 @@ fn recalculate_group(
     let flex_direction = group_node.flex_direction;
     let child_entities: Vec<Entity> = children.iter().collect();
 
+    // Sum only visible panels — hidden ones (`Display::None`) are out
+    // of flex layout, so giving them a percentage steals space from
+    // siblings.
     let panels_ro = queries.p1();
     let total: f32 = panels_ro
         .iter_many(&child_entities)
+        .filter(|(node, _)| node.display != Display::None)
         .map(|(_, panel)| panel.ratio)
         .sum();
 
@@ -95,10 +99,14 @@ fn recalculate_group(
         return;
     }
 
-    // Pass 2: mutate panel nodes
+    // Pass 2: mutate panel nodes — skip hidden so we don't overwrite
+    // the zero-size set by a collapse toggle.
     let mut panels = queries.p1();
     let mut iterator = panels.iter_many_mut(&child_entities);
     while let Some((mut node, panel)) = iterator.fetch_next() {
+        if node.display == Display::None {
+            continue;
+        }
         let pct = (panel.ratio / total) * 100.;
         match flex_direction {
             FlexDirection::Row | FlexDirection::RowReverse => {

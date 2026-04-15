@@ -440,6 +440,15 @@ fn show_empty_anchors_during_drag(
 /// an empty anchor doesn't leave a stub panel + dangling resize handle.
 fn set_host_visible(world: &mut World, entity: Entity, visible: bool) {
     let target = if visible { Display::Flex } else { Display::None };
+    let anchor_id = world
+        .entity(entity)
+        .get::<AnchorHost>()
+        .map(|h| h.anchor_id.clone())
+        .unwrap_or_else(|| format!("<entity {entity:?}>"));
+    info!(
+        target: "collapse_debug",
+        "set_host_visible START anchor={anchor_id} visible={visible}"
+    );
 
     // Find the adjacent PanelHandle sibling (index ±1 in the parent's
     // children) so we can hide/show it alongside the host.
@@ -506,14 +515,59 @@ fn set_host_visible(world: &mut World, entity: Entity, visible: bool) {
         }
     }
 
-    // `recalculate_changed_panels` only watches `Changed<Panel>`, so a
-    // `Display` toggle alone won't re-run the percentage math. Bump the
-    // host's `Panel` change tick to force a recompute next frame.
+    // Bump Panel's change tick so the surrounding `recalculate_group`
+    // re-runs. Two possible component types on the host entity:
+    //   1. `jackdaw_widgets::split_panel::Panel` — the outer
+    //      three-column flex uses these (editor's `panel(1)` etc.).
+    //   2. `jackdaw_panels::split::Panel` — reconciler-spawned
+    //      splits inside an anchor host use our own type.
+    // Try both; only one should exist per entity. Using explicit
+    // `DerefMut` via `ratio = ratio` — `set_changed()` via
+    // `EntityWorldMut::get_mut` doesn't reliably flag `Changed<Panel>`
+    // for filter queries in later systems in Bevy 0.18.
     if any_changed {
+        let mut bumped = false;
+        if let Some(mut panel) = world
+            .entity_mut(entity)
+            .get_mut::<jackdaw_widgets::split_panel::Panel>()
+        {
+            let r = panel.ratio;
+            panel.ratio = r;
+            info!(
+                target: "collapse_debug",
+                "  bumped widgets::Panel.ratio={r} on {anchor_id}"
+            );
+            bumped = true;
+        }
         if let Some(mut panel) = world.entity_mut(entity).get_mut::<Panel>() {
-            panel.set_changed();
+            let r = panel.ratio;
+            panel.ratio = r;
+            info!(
+                target: "collapse_debug",
+                "  bumped jackdaw_panels::Panel.ratio={r} on {anchor_id}"
+            );
+            bumped = true;
+        }
+        if !bumped {
+            info!(
+                target: "collapse_debug",
+                "  WARN: no Panel found on {anchor_id} to bump"
+            );
         }
     }
+
+    let (final_display, final_width, final_height) = {
+        let node = world.entity(entity).get::<Node>();
+        (
+            node.map(|n| n.display),
+            node.map(|n| n.width),
+            node.map(|n| n.height),
+        )
+    };
+    info!(
+        target: "collapse_debug",
+        "set_host_visible END   anchor={anchor_id} any_changed={any_changed} display={final_display:?} width={final_width:?} height={final_height:?}"
+    );
 }
 
 fn despawn_children(world: &mut World, entity: Entity) {

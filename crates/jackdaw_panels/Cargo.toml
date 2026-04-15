@@ -10,6 +10,7 @@ repository = "https://github.com/jbuehler23/jackdaw"
 bevy.workspace = true
 serde.workspace = true
 jackdaw_feathers.workspace = true
+jackdaw_widgets.workspace = true
 lucide-icons.workspace = true
 
 [dev-dependencies]

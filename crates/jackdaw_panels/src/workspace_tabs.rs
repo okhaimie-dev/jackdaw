@@ -315,11 +315,15 @@ pub fn handle_workspace_tab_clicks(
 
 /// Click `+` to create a new workspace. Copies the current `DockTree`
 /// (so the new workspace starts visually identical to the current one)
-/// and switches to it.
+/// and switches to it. Also resets the outer three-column `Panel.ratio`
+/// values (left/right/bottom anchor hosts) to `1.0` so the new
+/// workspace starts with default proportions instead of inheriting
+/// whatever the user had dragged them to in the current workspace.
 pub fn handle_add_workspace_clicks(
     button_query: Query<&Interaction, (Changed<Interaction>, With<AddWorkspaceButton>)>,
     mut registry: ResMut<WorkspaceRegistry>,
     tree: Res<DockTree>,
+    mut anchor_panels: Query<&mut crate::split::Panel, With<crate::reconcile::AnchorHost>>,
     mut commands: Commands,
 ) {
     for interaction in button_query.iter() {
@@ -346,6 +350,17 @@ pub fn handle_add_workspace_clicks(
             layout: crate::layout::LayoutState::default(),
             tree: tree.clone(),
         });
+
+        // Reset outer anchor host Panel ratios to 1.0 (the editor's
+        // original `panel(1)` for left/right/bottom). `recalculate_group`
+        // picks up Changed<Panel> next frame and redistributes widths
+        // against the un-changed center (which stays at its `panel(4)`
+        // baseline). Skip unchanged panels so we don't spam change ticks.
+        for mut panel in &mut anchor_panels {
+            if panel.ratio != 1.0 {
+                panel.ratio = 1.0;
+            }
+        }
 
         let old = registry.active.clone();
         commands.trigger(WorkspaceChanged {

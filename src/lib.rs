@@ -2349,6 +2349,15 @@ fn open_window_in_default_area(world: &mut World, window_id: &str) {
     if lives_elsewhere {
         tree.move_window(window_id, target_leaf);
     } else if let Some(DockNode::Leaf(leaf)) = tree.get_mut(target_leaf) {
+        // Normalize: a leaf that was left over from a collapsed split
+        // still carries a synthetic `area_id` ("split.<window>.<id>")
+        // from when it was created. Now that the user is populating it
+        // afresh via this anchor, rewrite the area_id back to the
+        // canonical anchor name so downstream lookups (capture_layout,
+        // save/load diagnostics, etc.) see a consistent id.
+        if leaf.windows.is_empty() && leaf.area_id != default_area {
+            leaf.area_id = default_area.clone();
+        }
         if !leaf.windows.iter().any(|w| w == window_id) {
             leaf.windows.push(window_id.to_string());
         }

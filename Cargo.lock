@@ -4433,6 +4433,7 @@ version = "0.3.1"
 dependencies = [
  "bevy",
  "jackdaw_feathers",
+ "jackdaw_widgets",
  "lucide-icons",
  "serde",
  "serde_json",
