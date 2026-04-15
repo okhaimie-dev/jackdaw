@@ -4427,14 +4427,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jackdaw_panels"
-version = "0.3.1"
-dependencies = [
- "bevy",
- "serde",
-]
-
-[[package]]
 name = "jackdaw_remote"
 version = "0.3.1"
 dependencies = [

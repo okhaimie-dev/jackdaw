@@ -4,7 +4,6 @@ use bevy::prelude::*;
 use bevy::text::{FontFeatureTag, FontFeatures};
 use bevy_ui_text_input::actions::{TextInputAction, TextInputEdit};
 use bevy_ui_text_input::*;
-
 // Re-export key types from bevy_ui_text_input for consumers
 pub use bevy_ui_text_input::{TextInputBuffer, TextInputQueue};
 
@@ -130,6 +129,7 @@ pub struct TextEditConfig {
     default_value: Option<String>,
     min: f64,
     max: f64,
+    auto_focus: bool,
     allow_empty: bool,
     drag_bottom: bool,
     pub initialized: bool,
@@ -145,6 +145,7 @@ pub struct TextEditProps {
     pub suffix: Option<String>,
     pub min: f64,
     pub max: f64,
+    pub auto_focus: bool,
     pub allow_empty: bool,
     pub drag_bottom: bool,
     pub grow: bool,
@@ -162,6 +163,7 @@ impl Default for TextEditProps {
             suffix: None,
             min: f64::MIN,
             max: f64::MAX,
+            auto_focus: false,
             allow_empty: false,
             drag_bottom: false,
             grow: false,
@@ -210,6 +212,10 @@ impl TextEditProps {
         self.grow = true;
         self
     }
+    pub fn auto_focus(mut self) -> Self {
+        self.auto_focus = true;
+        self
+    }
     pub fn numeric_f32(mut self) -> Self {
         self.variant = TextEditVariant::NumericF32;
         self.filter = Some(FilterType::Decimal);
@@ -247,6 +253,7 @@ pub fn text_edit(props: TextEditProps) -> impl Bundle {
         suffix,
         min,
         max,
+        auto_focus,
         allow_empty,
         drag_bottom,
         grow: _,
@@ -271,6 +278,7 @@ pub fn text_edit(props: TextEditProps) -> impl Bundle {
             default_value,
             min,
             max,
+            auto_focus,
             allow_empty,
             drag_bottom,
             initialized: false,
@@ -283,6 +291,7 @@ fn setup_text_edit_input(
     mut commands: Commands,
     editor_font: Res<EditorFont>,
     mut configs: Query<(Entity, &mut TextEditConfig)>,
+    mut focus: ResMut<InputFocus>,
 ) {
     let font = editor_font.0.clone();
     let tabular_figures: FontFeatures = [FontFeatureTag::TABULAR_FIGURES].into();
@@ -499,6 +508,10 @@ fn setup_text_edit_input(
                 ..default()
             },
         ));
+
+        if config.auto_focus {
+            focus.0 = Some(text_input.id());
+        }
 
         if let Some(filter) = filter {
             text_input.insert(filter);
