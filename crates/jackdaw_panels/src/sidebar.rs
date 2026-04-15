@@ -151,6 +151,5 @@ pub fn on_sidebar_icon_right_click(
     let Ok(icon) = icons.get(trigger.event_target()) else {
         return;
     };
-    info!("Close sidebar window: {}", icon.window_id);
     tree.remove_window(&icon.window_id);
 }

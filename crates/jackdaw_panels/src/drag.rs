@@ -382,10 +382,6 @@ fn on_drag_end(
                 match target {
                     DropTarget::TabBar(target_area) => {
                         if target_area != source_area {
-                            info!(
-                                "Dock drag: move '{}' to area {:?} as tab",
-                                window_id, target_area
-                            );
                             let wid = window_id.clone();
                             commands.queue(move |world: &mut World| {
                                 drop_on_area(world, &wid, target_area);
@@ -393,10 +389,6 @@ fn on_drag_end(
                         }
                     }
                     DropTarget::AreaEdge { area, edge } => {
-                        info!(
-                            "Dock drag: split area {:?} at {:?} with '{}'",
-                            area, edge, window_id
-                        );
                         let wid = window_id.clone();
                         commands.queue(move |world: &mut World| {
                             drop_on_edge(world, &wid, area, edge);

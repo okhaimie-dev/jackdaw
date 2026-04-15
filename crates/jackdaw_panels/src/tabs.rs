@@ -296,6 +296,5 @@ fn on_close_button_click(
     let Ok(close_btn) = close_buttons.get(entity) else {
         return;
     };
-    info!("Close tab: {}", close_btn.window_id);
     tree.remove_window(&close_btn.window_id);
 }

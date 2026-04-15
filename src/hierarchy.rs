@@ -61,6 +61,7 @@ impl Plugin for HierarchyPlugin {
         app.init_resource::<ContextMenuState>()
             .init_resource::<PendingTemplateDefaultName>()
             .init_resource::<HierarchyShowAll>()
+            .add_systems(Startup, setup_tree_node_expanded_watcher)
             .add_systems(
                 OnEnter(crate::AppState::Editor),
                 setup_name_watcher,
@@ -323,6 +324,19 @@ fn setup_name_watcher(mut commands: Commands) {
     commands
         .spawn((EditorEntity, NotifyChanged::<Name>::default()))
         .observe(on_name_mutated);
+}
+
+/// Pre-register the `NotifyChanged<TreeNodeExpanded>` hook during
+/// Startup. `bevy_monitors`'s add-hook queues a command that calls
+/// `world.schedule_scope(Update, ...)` the first time any entity with
+/// `NotifyChanged<C>` spawns. If that first spawn happens while `Update`
+/// is already executing (e.g. `reconcile_tree` spawning scene tree rows
+/// on workspace switch), the queued command panics with "Schedule
+/// Update not found". Registering a watcher entity here in Startup
+/// flushes the hook before any `Update` tick runs, so subsequent spawns
+/// take the `DetectingChanges<TreeNodeExpanded>` early-return branch.
+fn setup_tree_node_expanded_watcher(mut commands: Commands) {
+    commands.spawn(NotifyChanged::<TreeNodeExpanded>::default());
 }
 
 /// When an entity's Name is mutated in-place (e.g. via inspector), update the tree row label.

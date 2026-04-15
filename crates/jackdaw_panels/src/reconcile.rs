@@ -441,33 +441,67 @@ fn show_empty_anchors_during_drag(
 fn set_host_visible(world: &mut World, entity: Entity, visible: bool) {
     let target = if visible { Display::Flex } else { Display::None };
 
-    let parent = world.entity(entity).get::<ChildOf>().map(|co| co.parent());
-    let mut to_toggle: Vec<Entity> = vec![entity];
-    if let Some(parent) = parent {
-        let siblings: Vec<Entity> = world
-            .entity(parent)
-            .get::<Children>()
-            .map(|c| c.iter().collect())
-            .unwrap_or_default();
-        if let Some(idx) = siblings.iter().position(|&e| e == entity) {
-            for neighbor in [idx.checked_sub(1), Some(idx + 1)]
+    // Find the adjacent PanelHandle sibling (index ±1 in the parent's
+    // children) so we can hide/show it alongside the host.
+    let adjacent_handle = {
+        let parent = world.entity(entity).get::<ChildOf>().map(|co| co.parent());
+        parent.and_then(|parent| {
+            let siblings: Vec<Entity> = world
+                .entity(parent)
+                .get::<Children>()
+                .map(|c| c.iter().collect())
+                .unwrap_or_default();
+            let idx = siblings.iter().position(|&e| e == entity)?;
+            [idx.checked_sub(1), Some(idx + 1)]
                 .into_iter()
                 .flatten()
                 .filter_map(|i| siblings.get(i).copied())
-            {
-                if world.entity(neighbor).contains::<PanelHandle>() {
-                    to_toggle.push(neighbor);
-                    break;
-                }
+                .find(|&e| world.entity(e).contains::<PanelHandle>())
+        })
+    };
+
+    let mut any_changed = false;
+
+    // Host: toggle Display and drive geometry only when the state
+    // actually transitions. Unconditionally setting width/height every
+    // reconcile pass would stomp on the ratio-based percentages that
+    // `recalculate_group` has already written for an already-visible
+    // panel — producing a "massive" panel (width: 100% of Row parent).
+    if let Some(mut node) = world.entity_mut(entity).get_mut::<Node>() {
+        if node.display != target {
+            node.display = target;
+            any_changed = true;
+        }
+        let zero = Val::Px(0.0);
+        if !visible {
+            // Zero the host on hide so taffy can't reserve a layout
+            // floor. Skip if already zeroed.
+            if node.width != zero || node.height != zero {
+                node.width = zero;
+                node.height = zero;
+                node.min_width = zero;
+                node.min_height = zero;
+                any_changed = true;
             }
+        } else if node.width == zero {
+            // Coming back from hide: restore to 100% so
+            // `recalculate_group` can overwrite the flex-axis and the
+            // cross-axis fills. Only do this once per show — don't
+            // stomp on an already-recalculated width.
+            node.width = Val::Percent(100.0);
+            node.height = Val::Percent(100.0);
+            any_changed = true;
         }
     }
-    let mut display_changed = false;
-    for e in to_toggle {
-        if let Some(mut node) = world.entity_mut(e).get_mut::<Node>() {
+
+    // Handle: ONLY toggle Display. Don't touch width/height — a
+    // `PanelHandle`'s natural size is a 3px stripe along the flex axis;
+    // forcing 100% would make it fill the parent.
+    if let Some(handle) = adjacent_handle {
+        if let Some(mut node) = world.entity_mut(handle).get_mut::<Node>() {
             if node.display != target {
                 node.display = target;
-                display_changed = true;
+                any_changed = true;
             }
         }
     }
@@ -475,7 +509,7 @@ fn set_host_visible(world: &mut World, entity: Entity, visible: bool) {
     // `recalculate_changed_panels` only watches `Changed<Panel>`, so a
     // `Display` toggle alone won't re-run the percentage math. Bump the
     // host's `Panel` change tick to force a recompute next frame.
-    if display_changed {
+    if any_changed {
         if let Some(mut panel) = world.entity_mut(entity).get_mut::<Panel>() {
             panel.set_changed();
         }

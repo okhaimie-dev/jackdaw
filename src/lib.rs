@@ -1906,43 +1906,30 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
             });
         }
         action if action.starts_with("window.") => {
+            if action == "window.reset_layout" {
+                commands.queue(|world: &mut World| {
+                    reset_layout(world);
+                });
+                return;
+            }
+
             let window_id = match action {
+                "window.hierarchy" => Some("jackdaw.hierarchy"),
+                "window.import" => Some("jackdaw.import"),
+                "window.project_files" => Some("jackdaw.project_files"),
                 "window.assets" => Some("jackdaw.assets"),
                 "window.timeline" => Some("jackdaw.timeline"),
                 "window.terminal" => Some("jackdaw.terminal"),
-                "window.reset_layout" => {
-                    info!("Reset layout — not yet implemented");
-                    None
-                }
+                "window.components" => Some("jackdaw.inspector.components"),
+                "window.materials" => Some("jackdaw.inspector.materials"),
+                "window.resources" => Some("jackdaw.inspector.resources"),
+                "window.systems" => Some("jackdaw.inspector.systems"),
                 _ => None,
             };
             if let Some(id) = window_id {
                 let id = id.to_string();
                 commands.queue(move |world: &mut World| {
-                    // Add into the first leaf reachable from the "left"
-                    // anchor — if the user has split it, we still land in
-                    // whichever sub-panel the walker finds first.
-                    let leaf_id = {
-                        let tree = world.resource::<jackdaw_panels::tree::DockTree>();
-                        let Some(root) = tree.anchor("left") else {
-                            return;
-                        };
-                        tree.leaves_under(root)
-                            .first()
-                            .map(|(id, _)| *id)
-                    };
-                    let Some(leaf_id) = leaf_id else {
-                        return;
-                    };
-                    let mut tree = world.resource_mut::<jackdaw_panels::tree::DockTree>();
-                    if let Some(jackdaw_panels::tree::DockNode::Leaf(leaf)) =
-                        tree.get_mut(leaf_id)
-                    {
-                        if !leaf.windows.iter().any(|w| w == &id) {
-                            leaf.windows.push(id.clone());
-                        }
-                        leaf.active = Some(id);
-                    }
+                    open_window_in_default_area(world, &id);
                 });
             }
         }
@@ -2195,6 +2182,7 @@ fn register_workspaces(mut registry: ResMut<jackdaw_panels::WorkspaceRegistry>) 
         icon: Some(String::from(Icon::File.unicode())),
         accent_color: Color::srgba(0.35, 0.55, 1.0, 0.8),
         layout: jackdaw_panels::LayoutState::default(),
+        tree: jackdaw_panels::tree::DockTree::default(),
     });
 
     registry.register(jackdaw_panels::WorkspaceDescriptor {
@@ -2203,6 +2191,7 @@ fn register_workspaces(mut registry: ResMut<jackdaw_panels::WorkspaceRegistry>) 
         icon: Some(String::from(Icon::CalendarSearch.unicode())),
         accent_color: Color::srgba(0.8, 0.55, 0.35, 0.8),
         layout: jackdaw_panels::LayoutState::default(),
+        tree: jackdaw_panels::tree::DockTree::default(),
     });
 }
 
@@ -2231,13 +2220,17 @@ fn auto_save_layout_on_change(
     active_changed: Query<Entity, Changed<jackdaw_panels::ActiveDockWindow>>,
     area_added: Query<Entity, Added<jackdaw_panels::DockArea>>,
     mut removed: RemovedComponents<jackdaw_panels::DockArea>,
+    tree: Res<jackdaw_panels::tree::DockTree>,
+    registry: Res<jackdaw_panels::WorkspaceRegistry>,
 ) {
     let now = time.elapsed_secs_f64();
 
     let any_change = !panels_changed.is_empty()
         || !active_changed.is_empty()
         || !area_added.is_empty()
-        || removed.read().next().is_some();
+        || removed.read().next().is_some()
+        || tree.is_changed()
+        || registry.is_changed();
 
     if any_change {
         state.pending_since = Some(now);
@@ -2260,6 +2253,11 @@ fn auto_save_layout_on_change(
 /// despawn freshly-spawned content while its deferred init systems
 /// (project_files refresh, material_browser scan, etc.) still hold
 /// pointers to it.
+///
+/// Supports three save formats (in priority order):
+/// 1. `WorkspacesPersist` — full per-workspace registry (current).
+/// 2. Bare `DockTree` — single-workspace layout (older format).
+/// 3. None / unparseable — fall through to defaults.
 fn init_layout(world: &mut World) {
     let layout_json = world
         .get_resource::<crate::project::ProjectRoot>()
@@ -2267,14 +2265,29 @@ fn init_layout(world: &mut World) {
 
     let mut loaded_tree = false;
     if let Some(json) = layout_json {
-        match serde_json::from_value::<jackdaw_panels::tree::DockTree>(json) {
-            Ok(tree) => {
+        // Try the per-workspace format first.
+        if let Ok(persist) =
+            serde_json::from_value::<jackdaw_panels::WorkspacesPersist>(json.clone())
+        {
+            if !persist.workspaces.is_empty() {
+                let mut registry =
+                    world.resource_mut::<jackdaw_panels::WorkspaceRegistry>();
+                persist.apply_to_registry(&mut registry);
+                let active_tree = registry
+                    .active_workspace()
+                    .map(|w| w.tree.clone());
+                drop(registry);
+                if let Some(tree) = active_tree {
+                    world.insert_resource(tree);
+                    loaded_tree = true;
+                }
+            }
+        }
+        // Fall back to the older bare-DockTree format.
+        if !loaded_tree {
+            if let Ok(tree) = serde_json::from_value::<jackdaw_panels::tree::DockTree>(json) {
                 world.insert_resource(tree);
                 loaded_tree = true;
-                info!("Applied saved DockTree layout");
-            }
-            Err(e) => {
-                warn!("Saved layout couldn't be parsed as DockTree ({e}); seeding defaults");
             }
         }
     }
@@ -2285,6 +2298,89 @@ fn init_layout(world: &mut World) {
     }
 
     jackdaw_panels::reconcile::reconcile(world);
+
+    // Make sure the active workspace's `.tree` matches the live tree —
+    // covers both the "fresh defaults" path and the older bare-DockTree
+    // load path, so subsequent workspace switches save/restore correctly.
+    sync_active_workspace_from_live_tree(world);
+}
+
+/// Open `window_id` in its registered `default_area` anchor. If the
+/// window already lives in a different leaf, move it there (no dupes).
+/// If it isn't in the tree at all, push it onto the target leaf and
+/// activate. Pushing populates the target leaf, which un-hides the
+/// anchor automatically via the reconciler's collapse logic.
+fn open_window_in_default_area(world: &mut World, window_id: &str) {
+    use jackdaw_panels::tree::{DockNode, DockTree};
+
+    let Some(default_area) = world
+        .resource::<jackdaw_panels::WindowRegistry>()
+        .get(window_id)
+        .map(|d| d.default_area.clone())
+    else {
+        return;
+    };
+
+    let target_leaf = {
+        let tree = world.resource::<DockTree>();
+        let Some(root) = tree.anchor(&default_area) else {
+            return;
+        };
+        tree.leaves_under(root).first().map(|(id, _)| *id)
+    };
+    let Some(target_leaf) = target_leaf else {
+        return;
+    };
+
+    let already_in_target = world
+        .resource::<DockTree>()
+        .get(target_leaf)
+        .and_then(|n| n.as_leaf())
+        .map(|l| l.windows.iter().any(|w| w == window_id))
+        .unwrap_or(false);
+
+    let lives_elsewhere = !already_in_target
+        && world
+            .resource::<DockTree>()
+            .find_leaf(window_id)
+            .is_some();
+
+    let mut tree = world.resource_mut::<DockTree>();
+    if lives_elsewhere {
+        tree.move_window(window_id, target_leaf);
+    } else if let Some(DockNode::Leaf(leaf)) = tree.get_mut(target_leaf) {
+        if !leaf.windows.iter().any(|w| w == window_id) {
+            leaf.windows.push(window_id.to_string());
+        }
+        leaf.active = Some(window_id.to_string());
+    }
+}
+
+/// Reset the active workspace to the default seed: clear the live tree,
+/// re-seed anchors from the registry, restore the default left split,
+/// and reconcile in a single pass. Same path `init_layout` takes for a
+/// fresh editor launch.
+fn reset_layout(world: &mut World) {
+    *world.resource_mut::<jackdaw_panels::tree::DockTree>() =
+        jackdaw_panels::tree::DockTree::default();
+    jackdaw_panels::reconcile::seed_anchors(world);
+    apply_default_splits(world);
+    jackdaw_panels::reconcile::reconcile(world);
+    sync_active_workspace_from_live_tree(world);
+}
+
+fn sync_active_workspace_from_live_tree(world: &mut World) {
+    let live = world.resource::<jackdaw_panels::tree::DockTree>().clone();
+    let active_id = world
+        .resource::<jackdaw_panels::WorkspaceRegistry>()
+        .active
+        .clone();
+    if let Some(id) = active_id {
+        let mut registry = world.resource_mut::<jackdaw_panels::WorkspaceRegistry>();
+        if let Some(ws) = registry.get_mut(&id) {
+            ws.tree = live;
+        }
+    }
 }
 
 /// First-run / reset layout: the `left` anchor is seeded as a single
@@ -2325,7 +2421,6 @@ fn apply_default_splits(world: &mut World) {
             tree.set_fraction(split_id, 0.75);
         }
     }
-    info!("Applied default left-pane split (project files on bottom)");
 }
 
 fn sync_icon_font(

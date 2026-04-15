@@ -311,12 +311,27 @@ pub fn save_layout_to_project(world: &mut World) {
         return;
     };
 
-    // Serialize the DockTree directly so splits + fractions persist.
-    let tree = world.resource::<jackdaw_panels::tree::DockTree>().clone();
-    let layout_json = match serde_json::to_value(&tree) {
+    // Snapshot the live tree into the active workspace before
+    // serializing, so the saved registry reflects what's on screen.
+    let live_tree = world.resource::<jackdaw_panels::tree::DockTree>().clone();
+    let active_id = world
+        .resource::<jackdaw_panels::WorkspaceRegistry>()
+        .active
+        .clone();
+    if let Some(id) = active_id {
+        let mut registry = world.resource_mut::<jackdaw_panels::WorkspaceRegistry>();
+        if let Some(ws) = registry.get_mut(&id) {
+            ws.tree = live_tree;
+        }
+    }
+
+    let persist = jackdaw_panels::WorkspacesPersist::from_registry(
+        world.resource::<jackdaw_panels::WorkspaceRegistry>(),
+    );
+    let layout_json = match serde_json::to_value(&persist) {
         Ok(v) => v,
         Err(e) => {
-            warn!("Failed to serialize layout tree: {e}");
+            warn!("Failed to serialize workspaces: {e}");
             return;
         }
     };

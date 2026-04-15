@@ -1478,6 +1478,7 @@ fn right_dock_area() -> impl Bundle {
         },
         EditorEntity,
         Node {
+            width: percent(100),
             height: percent(100),
             flex_direction: FlexDirection::Column,
             overflow: Overflow::clip(),
