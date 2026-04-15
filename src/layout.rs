@@ -373,8 +373,8 @@ fn play_pause_controls() -> impl Bundle {
 
 /// Left column: a single anchor host the user can split like the right
 /// sidebar. The default layout pre-splits it vertically (Scene Tree +
-/// Import on top, Project Files on bottom) via
-/// [`apply_default_splits`] on first launch.
+/// Import on top, Project Files on bottom) on first launch via
+/// `apply_default_splits` in the editor crate.
 fn left_dock_area() -> impl Bundle {
     (
         jackdaw_panels::reconcile::AnchorHost {
