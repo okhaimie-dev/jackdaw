@@ -1,17 +1,18 @@
 //! Viewable Camera extension.
 //!
 //! - **F6**: place a viewable camera at the editor camera position.
-//!   Undoable via a custom `EditorCommand`.
+//!   The dispatcher captures the scene diff automatically, so one
+//!   Ctrl+Z despawns the camera.
 //! - **F7**: toggle between the editor view and looking through the
-//!   viewable camera. Preview is view state, not scene data, and is
-//!   not recorded in the undo history.
+//!   viewable camera. Preview mutates Bevy resources and components
+//!   that aren't in the scene AST, so the dispatcher's diff is empty
+//!   and no history entry is pushed.
 
 use bevy::camera::RenderTarget;
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use bevy_enhanced_input::prelude::*;
 use jackdaw_api::prelude::*;
-use jackdaw_commands::EditorCommand;
 
 pub struct ViewableCameraExtension;
 
@@ -105,12 +106,28 @@ fn place_viewable_camera(world: &mut World) -> OperatorResult {
         .and_then(|e| world.get::<Transform>(e).copied())
         .unwrap_or_default();
 
-    let mut cmd: Box<dyn EditorCommand> = Box::new(PlaceViewableCameraCommand {
-        spawned: None,
-        transform: spawn_transform,
-    });
-    cmd.execute(world);
-    world.resource_mut::<OperatorCommandBuffer>().record(cmd);
+    world.spawn((
+        Name::new("Viewable Camera"),
+        ViewableCamera,
+        Camera3d::default(),
+        Camera {
+            // Stays off until `enter_preview` hands over the viewport
+            // image target.
+            is_active: false,
+            order: -1,
+            ..default()
+        },
+        // `Camera`'s required components default `RenderTarget` to the
+        // primary window, which would render over the editor UI if
+        // `is_active` ever flipped true. Keep the camera inert until
+        // `enter_preview` swaps in the viewport image target.
+        RenderTarget::None {
+            size: UVec2::splat(1),
+        },
+        spawn_transform,
+        Visibility::default(),
+    ));
+
     OperatorResult::Finished
 }
 
@@ -245,55 +262,5 @@ fn restore_editor_camera(world: &mut World) {
 
     if let Some(mut c) = world.get_mut::<Camera>(editor_cam) {
         c.is_active = true;
-    }
-}
-
-/// Undoable placement of a viewable camera. Redo re-executes, which
-/// spawns a new entity id; the scene tree and inspector resolve by id
-/// each frame so that's fine.
-struct PlaceViewableCameraCommand {
-    spawned: Option<Entity>,
-    transform: Transform,
-}
-
-impl EditorCommand for PlaceViewableCameraCommand {
-    fn execute(&mut self, world: &mut World) {
-        let entity = world
-            .spawn((
-                Name::new("Viewable Camera"),
-                ViewableCamera,
-                Camera3d::default(),
-                Camera {
-                    // Stays off until `enter_preview` hands over the
-                    // viewport image target.
-                    is_active: false,
-                    order: -1,
-                    ..default()
-                },
-                // `Camera`'s required components default `RenderTarget`
-                // to the primary window, which would render over the
-                // editor UI if `is_active` ever flipped true. Keep the
-                // camera inert until `enter_preview` swaps in the
-                // viewport image target.
-                RenderTarget::None {
-                    size: UVec2::splat(1),
-                },
-                self.transform,
-                Visibility::default(),
-            ))
-            .id();
-        self.spawned = Some(entity);
-    }
-
-    fn undo(&mut self, world: &mut World) {
-        if let Some(entity) = self.spawned.take()
-            && let Ok(ec) = world.get_entity_mut(entity)
-        {
-            ec.despawn();
-        }
-    }
-
-    fn description(&self) -> &str {
-        "Place Viewable Camera"
     }
 }

@@ -7556,7 +7556,6 @@ dependencies = [
  "bevy",
  "bevy_enhanced_input",
  "jackdaw_api",
- "jackdaw_commands",
 ]
 
 [[package]]
