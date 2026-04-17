@@ -56,11 +56,11 @@ pub const SELECTION_MARQUEE_BG: Color = Color::srgba(0.3, 0.5, 1.0, 0.1);
 pub const SELECTION_MARQUEE_BORDER: Color = Color::srgba(0.3, 0.5, 1.0, 0.7);
 
 // ── Brush edit mode ──
-pub const EDIT_EDGE: Color = Color::srgba(1.0, 0.8, 0.0, 1.0);
-pub const EDIT_VERTEX: Color = Color::srgba(1.0, 1.0, 1.0, 1.0);
-pub const EDIT_VERTEX_SELECTED: Color = Color::srgba(0.0, 1.0, 0.5, 1.0);
-pub const HOVER_FACE_PUSH_PULL: Color = Color::srgba(1.0, 0.8, 0.0, 0.9);
-pub const HOVER_FACE_EXTEND: Color = Color::srgba(1.0, 0.5, 0.0, 0.9);
+/// Things that are currently being edited
+pub const EDIT_SELECTED_COLOR: Color = Color::srgba(1.0, 0.0, 0.0, 1.0);
+/// For things that are not currently being edited, but could be if the user e.g. clicked on them
+pub const EDIT_AVAILABLE_COLOR: Color = Color::srgba(0.996, 0.996, 0.133333, 1.0);
+pub const EDIT_VERTEX_RADIUS: f32 = 0.04;
 pub const FACE_NORMAL_ARROW: Color = Color::srgb(0.0, 1.0, 1.0);
 pub const FACE_EXTRUDE_PREVIEW: Color = Color::srgb(0.0, 1.0, 0.5);
 

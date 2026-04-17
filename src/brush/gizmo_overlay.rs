@@ -5,7 +5,7 @@ use super::interaction::{
 };
 use super::{BrushEditMode, BrushMeshCache, BrushSelection, EditMode};
 use crate::default_style;
-use crate::face_grid::BrushWireframeUnselectedGizmoGroup;
+use crate::face_grid::BrushOutlineSelectedGizmoGroup;
 use jackdaw_jsn::Brush;
 
 pub(super) fn draw_brush_edit_gizmos(
@@ -18,7 +18,7 @@ pub(super) fn draw_brush_edit_gizmos(
     edge_drag: Res<EdgeDragState>,
     face_drag: Res<BrushDragState>,
     hover: Res<super::BrushFaceHover>,
-    mut gizmos: Gizmos<BrushWireframeUnselectedGizmoGroup>,
+    mut gizmos: Gizmos<BrushOutlineSelectedGizmoGroup>,
 ) {
     // Draw hover face outline (works in both Object and Edit modes)
     if let (Some(hover_entity), Some(hover_face)) = (hover.entity, hover.face_index) {
@@ -30,10 +30,7 @@ pub(super) fn draw_brush_edit_gizmos(
                     let is_selected = brush_selection.faces.contains(&hover_face)
                         && brush_selection.entity == Some(hover_entity);
                     if !is_selected {
-                        let color = match hover.intent {
-                            super::HoverIntent::PushPull => default_style::HOVER_FACE_PUSH_PULL,
-                            super::HoverIntent::Extend => default_style::HOVER_FACE_EXTEND,
-                        };
+                        let color = default_style::EDIT_SELECTED_COLOR;
                         for i in 0..polygon.len() {
                             let a = brush_global.transform_point(cache.vertices[polygon[i]]);
                             let b = brush_global
@@ -93,22 +90,31 @@ pub(super) fn draw_brush_edit_gizmos(
             let wa = brush_global.transform_point(cache.vertices[a]);
             let wb = brush_global.transform_point(cache.vertices[b]);
             let color = if selected {
-                default_style::EDIT_VERTEX_SELECTED
+                default_style::EDIT_SELECTED_COLOR
             } else {
-                default_style::EDIT_EDGE
+                default_style::EDIT_AVAILABLE_COLOR
             };
-            gizmos.line(wa, wb, color);
+            if selected || mode == BrushEditMode::Edge {
+                gizmos.line(wa, wb, color);
+            }
         }
 
         // Draw vertices as small spheres
         for (vi, v) in cache.vertices.iter().enumerate() {
             let world_pos = brush_global.transform_point(*v);
-            let color = if brush_selection.vertices.contains(&vi) {
-                default_style::EDIT_VERTEX_SELECTED
+            let selected = brush_selection.vertices.contains(&vi);
+            let color = if selected {
+                default_style::EDIT_SELECTED_COLOR
             } else {
-                default_style::EDIT_VERTEX
+                default_style::EDIT_AVAILABLE_COLOR
             };
-            gizmos.sphere(Isometry3d::from_translation(world_pos), 0.04, color);
+            if selected || mode == BrushEditMode::Vertex {
+                gizmos.sphere(
+                    Isometry3d::from_translation(world_pos),
+                    default_style::EDIT_VERTEX_RADIUS,
+                    color,
+                );
+            }
         }
     }
 
@@ -125,7 +131,7 @@ pub(super) fn draw_brush_edit_gizmos(
                     let a = brush_global.transform_point(cache.vertices[polygon[i]]);
                     let b = brush_global
                         .transform_point(cache.vertices[polygon[(i + 1) % polygon.len()]]);
-                    gizmos.line(a, b, default_style::EDIT_VERTEX_SELECTED);
+                    gizmos.line(a, b, default_style::EDIT_SELECTED_COLOR);
                 }
                 // Draw the face normal from centroid
                 let centroid: Vec3 = polygon.iter().map(|&vi| cache.vertices[vi]).sum::<Vec3>()
