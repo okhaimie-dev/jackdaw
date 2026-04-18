@@ -41,10 +41,11 @@ fn smoke_test_headless_update() {
 #[test]
 fn can_run_extension() {
     let mut app = headless_app();
-    jackdaw_api::register_extension(&mut app, "sample_extension", || Box::new(SampleExtension));
+    app.register_extension::<SampleExtension>();
     app.finish();
 }
 
+#[derive(Default)]
 pub struct SampleExtension;
 
 impl JackdawExtension for SampleExtension {
