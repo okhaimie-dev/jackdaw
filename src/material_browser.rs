@@ -743,6 +743,7 @@ fn update_preview_area(
     dragging_query: Query<(), With<TextEditDragging>>,
     all_children_query: Query<&Children>,
     icon_font: Res<icons::IconFont>,
+    mut last_material: ResMut<LastUsedMaterial>,
 ) {
     let icon_font = icon_font.0.clone();
     if !preview_state.is_changed() {
@@ -819,10 +820,10 @@ fn update_preview_area(
 
     // Apply button
     let handle_for_apply = active_handle.clone();
+    // set the last used material to the active handle, but don't change the material of the current selection
+    // this makes it really nice to draw new brushes after clicking on something without accidentally changing the current selection's material
+    last_material.material = Some(handle_for_apply.clone());
 
-    commands.trigger(ApplyMaterialDefToFaces {
-        material: handle_for_apply.clone(),
-    });
     let apply_btn = commands
         .spawn((
             Node {
