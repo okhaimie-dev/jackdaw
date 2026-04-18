@@ -180,7 +180,7 @@ impl Plugin for BrushPlugin {
                     interaction::handle_clip_mode,
                 )
                     .chain()
-                    .in_set(crate::EditorInteraction),
+                    .in_set(crate::EditorInteractionSystems),
             )
             .add_systems(
                 Update,
@@ -193,7 +193,7 @@ impl Plugin for BrushPlugin {
                     gizmo_overlay::draw_brush_edit_gizmos,
                 )
                     .chain()
-                    .after(crate::EditorInteraction)
+                    .after(crate::EditorInteractionSystems)
                     .run_if(in_state(crate::AppState::Editor)),
             );
     }

@@ -32,7 +32,7 @@ impl Plugin for ViewportSelectPlugin {
                     update_box_select_overlay,
                     exit_group_on_escape,
                 )
-                    .in_set(crate::EditorInteraction),
+                    .in_set(crate::EditorInteractionSystems),
             );
     }
 }

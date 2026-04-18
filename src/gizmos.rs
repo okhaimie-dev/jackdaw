@@ -87,7 +87,7 @@ impl Plugin for TransformGizmosPlugin {
                     handle_gizmo_drag,
                 )
                     .chain()
-                    .in_set(crate::EditorInteraction),
+                    .in_set(crate::EditorInteractionSystems),
             )
             .add_systems(
                 Update,

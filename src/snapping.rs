@@ -15,7 +15,7 @@ impl Plugin for SnappingPlugin {
             .init_resource::<GridSettings>()
             .add_systems(
                 Update,
-                handle_grid_size_keys.in_set(crate::EditorInteraction),
+                handle_grid_size_keys.in_set(crate::EditorInteractionSystems),
             )
             .add_systems(
                 Update,

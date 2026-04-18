@@ -61,7 +61,7 @@ use selection::Selection;
 /// System set for all editor interaction systems (input handling, viewport clicks,
 /// gizmo drags, etc.). Automatically disabled when any dialog is open.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct EditorInteraction;
+pub struct EditorInteractionSystems;
 
 /// System set for drawing systems. Scheduled in [`PostUpdate`] after all propagation sets.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -163,7 +163,7 @@ impl Plugin for EditorPlugin {
             .add_systems(Startup, (register_workspaces, sync_icon_font))
             .configure_sets(
                 Update,
-                EditorInteraction
+                EditorInteractionSystems
                     .run_if(in_state(AppState::Editor))
                     .run_if(no_dialog_open),
             )

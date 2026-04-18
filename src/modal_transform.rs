@@ -85,7 +85,7 @@ impl Plugin for ModalTransformPlugin {
                     viewport_drag_finish,
                 )
                     .chain()
-                    .in_set(crate::EditorInteraction),
+                    .in_set(crate::EditorInteractionSystems),
             );
     }
 }

@@ -298,7 +298,7 @@ impl Plugin for DrawBrushPlugin {
                     extend_face_to_brush,
                 )
                     .chain()
-                    .in_set(crate::EditorInteraction),
+                    .in_set(crate::EditorInteractionSystems),
             )
             .add_systems(
                 Update,

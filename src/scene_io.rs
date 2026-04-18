@@ -75,7 +75,7 @@ impl Plugin for SceneIoPlugin {
             .init_resource::<SceneDirtyState>()
             .add_systems(
                 Update,
-                handle_scene_io_keys.in_set(crate::EditorInteraction),
+                handle_scene_io_keys.in_set(crate::EditorInteractionSystems),
             )
             .add_systems(
                 Update,
