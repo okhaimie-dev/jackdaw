@@ -188,7 +188,7 @@ pub enum ExtensionKind {
 
 impl ExtensionCatalog {
     /// Register a constructor with its declared kind. Most callers
-    /// should use [`register_extension`] instead, which handles BEI
+    /// should use [`App::register_extension`] instead, which handles BEI
     /// context registration.
     pub fn register<F>(&mut self, name: impl Into<String>, kind: ExtensionKind, ctor: F)
     where
