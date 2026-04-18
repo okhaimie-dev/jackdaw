@@ -639,8 +639,11 @@ fn handle_apply_material(
     mut history: ResMut<CommandHistory>,
     brush_groups: Query<(), With<jackdaw_jsn::types::BrushGroup>>,
     children_query: Query<&Children>,
+    mut last_material: ResMut<LastUsedMaterial>,
     mut commands: Commands,
 ) {
+    last_material.material = Some(event.material.clone());
+
     if *edit_mode == EditMode::BrushEdit(BrushEditMode::Face) && !brush_selection.faces.is_empty() {
         if let Some(entity) = brush_selection.entity {
             if let Ok(mut brush) = brushes.get_mut(entity) {
@@ -740,7 +743,6 @@ fn update_preview_area(
     dragging_query: Query<(), With<TextEditDragging>>,
     all_children_query: Query<&Children>,
     icon_font: Res<icons::IconFont>,
-    mut last_material: ResMut<LastUsedMaterial>,
 ) {
     let icon_font = icon_font.0.clone();
     if !preview_state.is_changed() {
@@ -818,7 +820,9 @@ fn update_preview_area(
     // Apply button
     let handle_for_apply = active_handle.clone();
 
-    last_material.material = Some(handle_for_apply.clone());
+    commands.trigger(ApplyMaterialDefToFaces {
+        material: handle_for_apply.clone(),
+    });
     let apply_btn = commands
         .spawn((
             Node {
@@ -841,16 +845,13 @@ fn update_preview_area(
         TextColor(tokens::TEXT_PRIMARY),
         ChildOf(apply_btn),
     ));
-    commands.entity(apply_btn).observe(
-        move |_: On<Pointer<Click>>,
-              mut commands: Commands,
-              mut last_material: ResMut<LastUsedMaterial>| {
-            last_material.material = Some(handle_for_apply.clone());
+    commands
+        .entity(apply_btn)
+        .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
             commands.trigger(ApplyMaterialDefToFaces {
                 material: handle_for_apply.clone(),
             });
-        },
-    );
+        });
     commands.entity(apply_btn).observe(
         |hover: On<Pointer<Over>>, mut bg: Query<&mut BackgroundColor>| {
             if let Ok(mut bg) = bg.get_mut(hover.event_target()) {
