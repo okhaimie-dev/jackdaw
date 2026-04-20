@@ -34,7 +34,14 @@ pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
     ctx.entity_mut()
         .with_related::<ActionOf<CoreExtensionInputContext>>((
             Action::<DrawBrush>::new(),
-            bindings![(MouseButton::Left, Press::default())],
+            bindings![(MouseButton::Left, Press::default()),],
+        ))
+        .with_related::<ActionOf<CoreExtensionInputContext>>((
+            Action::<ActivateDrawBrushModalOp>::new(),
+            bindings![
+                (MouseButton::Back, Press::default()),
+                (KeyCode::KeyB, Press::default()),
+            ],
         ));
     ctx.register_operator::<ActivateDrawBrushModalOp>()
         .register_operator::<AddBrushOp>()
@@ -406,7 +413,6 @@ fn configure_draw_brush_gizmos(mut config_store: ResMut<GizmoConfigStore>) {
 
 fn draw_brush_activate(
     keyboard: Res<ButtonInput<KeyCode>>,
-    mouse: Res<ButtonInput<MouseButton>>,
     keybinds: Res<crate::keybinds::KeybindRegistry>,
     input_focus: Res<InputFocus>,
     mut draw_state: ResMut<DrawBrushState>,
@@ -431,10 +437,7 @@ fn draw_brush_activate(
 
     // B or Mouse4 = draw in Add mode, Alt+B = append to brush, C = draw in Cut mode
     let append = keybinds.just_pressed(EditorAction::AppendToBrush, &keyboard);
-    let mode = if keybinds.just_pressed(EditorAction::DrawAdd, &keyboard)
-        || append
-        || mouse.just_pressed(MouseButton::Back)
-    {
+    let mode = if append {
         DrawMode::Add
     } else if keybinds.just_pressed(EditorAction::DrawCut, &keyboard) {
         DrawMode::Cut
