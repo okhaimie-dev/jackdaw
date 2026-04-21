@@ -51,6 +51,9 @@ pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
             label: ActivateDrawBrushModalOp::LABEL.to_string(),
             operator_id: ActivateDrawBrushModalOp::ID,
         });
+
+    ctx.init_resource::<DrawBrushState>()
+        .init_resource::<StableIdCounter>();
 }
 
 #[operator(id = "viewport.draw_brush_modal", label = "Draw Brush", cancel = cancel_draw_brush_modal, modal = true)]
@@ -476,9 +479,8 @@ pub(crate) struct CutPreviewHidden;
 
 impl Plugin for DrawBrushPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DrawBrushState>()
-            .init_resource::<StableIdCounter>()
-            .init_gizmo_group::<DrawBrushGizmoGroup>()
+        // TODO: Move *all* of this into the `extension` method and turn systems into ops on the way.
+        app.init_gizmo_group::<DrawBrushGizmoGroup>()
             .add_systems(Startup, configure_draw_brush_gizmos)
             .add_systems(
                 Update,
