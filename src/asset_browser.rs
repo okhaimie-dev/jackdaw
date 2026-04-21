@@ -11,6 +11,7 @@ use bevy::{
     window::{PrimaryWindow, RawHandleWrapper},
 };
 use jackdaw_feathers::tooltip::ActiveTooltip;
+use jackdaw_feathers::text_edit::TextEditValue;
 use jackdaw_feathers::{file_browser, icons, icons::IconFont, popover, tokens};
 use jackdaw_widgets::file_browser::{FileBrowserItem, FileItemDoubleClicked};
 use rfd::AsyncFileDialog;
@@ -95,6 +96,7 @@ impl Plugin for AssetBrowserPlugin {
                     update_preview_panel,
                     check_watcher_events,
                     remove_incompatible_image_nodes,
+                    update_asset_browser_filter,
                 )
                     .run_if(in_state(crate::AppState::Editor)),
             )
@@ -200,6 +202,9 @@ pub struct AssetBrowserContent;
 
 #[derive(Component)]
 pub struct AssetBrowserBreadcrumb;
+
+#[derive(Component)]
+pub struct AssetBrowserFilter;
 
 #[derive(Component)]
 struct PreviewPanelContainer;
@@ -654,6 +659,16 @@ fn refresh_browser_on_change(
                 }
             }
         });
+}
+
+fn update_asset_browser_filter(
+    mut state: ResMut<AssetBrowserState>,
+    filters: Query<&TextEditValue, (With<AssetBrowserFilter>, Changed<TextEditValue>)>,
+) {
+    for filter in filters {
+        state.filter = filter.0.clone();
+        state.needs_refresh = true;
+    }
 }
 
 fn highlight_on_hover(hover: On<Pointer<Over>>, mut bg: Query<&mut BackgroundColor>) {
@@ -1308,7 +1323,7 @@ pub fn asset_browser_panel(icon_font: Handle<Font>) -> impl Bundle {
                                             width: Val::Px(200.0),
                                             ..Default::default()
                                         },
-                                        children![(jackdaw_feathers::text_edit::text_edit(
+                                        children![(AssetBrowserFilter, jackdaw_feathers::text_edit::text_edit(
                                             jackdaw_feathers::text_edit::TextEditProps::default()
                                                 .with_placeholder("Search...")
                                                 .allow_empty()
