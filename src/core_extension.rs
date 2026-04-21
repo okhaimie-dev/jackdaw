@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_enhanced_input::prelude::*;
+use bevy_enhanced_input::prelude::{Press, *};
 use jackdaw_api::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
@@ -21,10 +21,13 @@ impl JackdawExtension for JackdawCoreExtension {
         ctx.entity_mut().insert((
             CoreExtensionInputContext,
             actions!(
-                CoreExtensionInputContext
-                    [(Action::<CancelModalOp>::new(), bindings!(KeyCode::Escape))]
+                CoreExtensionInputContext[(
+                    Action::<CancelModalOp>::new(),
+                    bindings!((KeyCode::Escape, Press::default()))
+                )]
             ),
         ));
+        ctx.register_operator::<CancelModalOp>();
         crate::draw_brush::add_to_extension(ctx);
     }
 
@@ -40,9 +43,14 @@ pub struct CoreExtensionInputContext;
     id = "modal.cancel",
     label = "Cancel Tool",
     description = "Cancels the currently active tool",
-    allows_undo = false
+    allows_undo = false,
+    is_available = is_any_modal_active
 )]
 fn cancel_modal(_: In<OperatorParameters>, mut active: ActiveModalQuery) -> OperatorResult {
     active.cancel();
     OperatorResult::Finished
+}
+
+fn is_any_modal_active(active: ActiveModalQuery) -> bool {
+    active.is_modal_running()
 }
