@@ -426,7 +426,7 @@ fn package_name_from_manifest(project_dir: &Path) -> String {
 /// to avoid pulling in a toml dep. Handles the two shapes scaffolded
 /// projects use: `crate-type = ["cdylib"]` and
 /// `crate-type = ["rlib", "cdylib"]`.
-pub fn manifest_declares_cdylib(project_dir: &Path) -> bool {
+pub(crate) fn manifest_declares_cdylib(project_dir: &Path) -> bool {
     let Ok(contents) = std::fs::read_to_string(project_dir.join("Cargo.toml")) else {
         return false;
     };
