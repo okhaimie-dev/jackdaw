@@ -7087,6 +7087,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_fixture_extension"
+version = "0.0.0"
+dependencies = [
+ "bevy",
+ "bevy_enhanced_input",
+ "jackdaw_api",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
