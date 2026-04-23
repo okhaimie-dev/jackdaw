@@ -481,9 +481,18 @@ fn refresh_browser_on_change(
                         });
                     } else {
                         // 2D texture: apply to faces via operator.
+                        // User-driven thumbnail click — explicit
+                        // history opt-in since the `CallOperatorSettings`
+                        // default is `false` (nested operator calls
+                        // shouldn't push history; only user-facing
+                        // dispatchers opt in).
                         commands
                             .operator("material.apply_texture")
                             .param("path", click_path.clone())
+                            .settings(CallOperatorSettings {
+                                creates_history_entry: true,
+                                ..default()
+                            })
                             .call();
                     }
                 },
@@ -720,9 +729,16 @@ fn handle_file_double_click(
             .is_some_and(|e| e.eq_ignore_ascii_case("ktx2"))
             && is_ktx2_non_2d(p);
         if !is_non_2d {
+            // User-driven file double-click — opt in to history (see
+            // `CallOperatorSettings`' docstring for why the default is
+            // `false`).
             commands
                 .operator("material.apply_texture")
                 .param("path", event.path.clone())
+                .settings(CallOperatorSettings {
+                    creates_history_entry: true,
+                    ..default()
+                })
                 .call();
         }
     }
@@ -794,9 +810,7 @@ pub fn apply_texture(
 
     let mut modified: Vec<Entity> = Vec::new();
 
-    if *edit_mode == EditMode::BrushEdit(BrushEditMode::Face)
-        && !brush_selection.faces.is_empty()
-    {
+    if *edit_mode == EditMode::BrushEdit(BrushEditMode::Face) && !brush_selection.faces.is_empty() {
         if let Some(entity) = brush_selection.entity {
             if let Ok(mut brush) = brushes.get_mut(entity) {
                 for &face_idx in &brush_selection.faces {
@@ -1198,9 +1212,15 @@ fn update_preview_panel(
         commands
             .entity(apply_btn)
             .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
+                // Preview-panel Apply button — user-driven click, opt
+                // in to history explicitly (default is `false`).
                 commands
                     .operator("material.apply_texture")
                     .param("path", path_str.clone())
+                    .settings(CallOperatorSettings {
+                        creates_history_entry: true,
+                        ..default()
+                    })
                     .call();
             });
         commands.entity(apply_btn).observe(

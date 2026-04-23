@@ -198,21 +198,26 @@ impl<'w, 's> OperatorCommandsExt<'w, 's> for Commands<'w, 's> {
 #[derive(Clone, Debug, Copy)]
 pub struct CallOperatorSettings {
     /// Whether a successful call should push an undo entry. Default
-    /// `true`. Set `false` for view-local effects (camera moves,
-    /// preview toggles) that should not be undoable.
+    /// `false` — custom operators routinely invoke builtin operators
+    /// as part of their implementation, and those nested calls must
+    /// not spam the undo stack. Callers that represent a genuine
+    /// user-driven edit (keybind observers, menu items, toolbar
+    /// buttons) opt in explicitly by setting this to `true`.
+    ///
+    /// The central user-facing dispatchers in this repo already opt
+    /// in: the BEI `Fire<O>` observer at
+    /// `crates/jackdaw_api_internal/src/lib.rs` around line 347, the
+    /// menu dispatcher in `src/lib.rs:handle_menu_action`, the
+    /// context-menu dispatcher in `src/hierarchy.rs:on_context_menu_action`,
+    /// and the toolbar-button dispatcher in `src/layout.rs`.
     pub creates_history_entry: bool,
     pub execution_context: ExecutionContext,
 }
 
 impl Default for CallOperatorSettings {
     fn default() -> Self {
-        // Match the docstring on `creates_history_entry`: the common
-        // case (user-invoked operators like material apply) should
-        // push an undo entry. Operators that are view-local and
-        // shouldn't be undoable either set `allows_undo = false` on
-        // the operator itself or override this on the call site.
         Self {
-            creates_history_entry: true,
+            creates_history_entry: false,
             execution_context: default(),
         }
     }

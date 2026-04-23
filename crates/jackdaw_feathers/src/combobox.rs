@@ -225,8 +225,7 @@ fn setup_combobox(
                         parent.spawn((
                             ComboBoxTrigger(entity),
                             icon_button(
-                                IconButtonProps::new(Icon::Ellipsis)
-                                    .variant(ButtonVariant::Ghost),
+                                IconButtonProps::new(Icon::Ellipsis).variant(ButtonVariant::Ghost),
                                 &icon_font_handle,
                             ),
                         ));

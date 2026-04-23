@@ -1601,7 +1601,10 @@ fn cleanup_pending_new_scene(
 /// undo snapshots and re-spawned as scene entities on undo.
 fn collect_scene_entities_from_set(world: &mut World, editor_set: &HashSet<Entity>) -> Vec<Entity> {
     let roots: Vec<Entity> = world
-        .query_filtered::<Entity, (With<Name>, Without<bevy_enhanced_input::prelude::ActionSettings>)>()
+        .query_filtered::<Entity, (
+            With<Name>,
+            Without<bevy_enhanced_input::prelude::ActionSettings>,
+        )>()
         .iter(world)
         .filter(|e| !editor_set.contains(e))
         .collect();
@@ -1685,7 +1688,10 @@ pub(crate) fn despawn_scene_entities(world: &mut World) {
     let editor_set = collect_editor_entities(world);
 
     let roots: Vec<Entity> = world
-        .query_filtered::<Entity, (With<Name>, Without<bevy_enhanced_input::prelude::ActionSettings>)>()
+        .query_filtered::<Entity, (
+            With<Name>,
+            Without<bevy_enhanced_input::prelude::ActionSettings>,
+        )>()
         .iter(world)
         .filter(|e| !editor_set.contains(e))
         .collect();
@@ -1801,25 +1807,15 @@ pub fn apply_ast_to_world(world: &mut World, ast: &jackdaw_jsn::SceneJsnAst) {
         .collect();
 
     // Clear selection + tree rows before touching entities so observers
-    // don't fire on stale references.
+    // don't fire on stale references. `handle_undo_redo_keys` already
+    // calls `cancel_active_modal` before popping history, so any modal
+    // state (e.g. `DrawBrushState.active`) is reset by the operator
+    // framework's cancel path — no need to duplicate that here.
     world
         .resource_mut::<crate::selection::Selection>()
         .entities
         .clear();
     crate::hierarchy::clear_all_tree_rows(world);
-
-    // Reset volatile tool state so an undo/redo can't leave the
-    // draw-brush modal "half-active" — i.e. `DrawBrushState.active`
-    // lingering as `Some` after the scene it referenced was ripped
-    // out. A stale `Some` would make the next activate-modal return
-    // immediately (modal-already-suspected path) and the B key
-    // appear dead until the user reloaded the project.
-    if let Some(mut draw_state) =
-        world.get_resource_mut::<crate::draw_brush::DrawBrushState>()
-    {
-        draw_state.active = None;
-    }
-    debug!("apply_ast_to_world: cleared DrawBrushState.active and selection before scene reload");
 
     despawn_scene_entities(world);
 
@@ -1859,9 +1855,7 @@ pub fn apply_ast_to_world(world: &mut World, ast: &jackdaw_jsn::SceneJsnAst) {
             .iter()
             .filter_map(|sid| stable_to_entity.get(sid).copied())
             .collect();
-        world
-            .resource_mut::<crate::selection::Selection>()
-            .entities = restored.clone();
+        world.resource_mut::<crate::selection::Selection>().entities = restored.clone();
         for &entity in &restored {
             if let Ok(mut ec) = world.get_entity_mut(entity) {
                 ec.insert(crate::selection::Selected);
