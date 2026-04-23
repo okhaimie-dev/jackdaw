@@ -232,7 +232,13 @@ const MIN_EXTRUDE_DEPTH: f32 = 0.01;
 const MIN_FRAGMENT_SIZE: f32 = 0.005;
 
 /// Stable identifier that persists across despawn/respawn cycles for undo/redo.
-#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug)]
+///
+/// Reflect-registered so it survives the snapshot round-trip: undo serializes
+/// the scene via `AstSerializerProcessor` and respawns fresh entity IDs, so
+/// any selection restore logic that matches across undo must key off a
+/// component whose value is preserved through reflect — hence this one.
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug, Reflect)]
+#[reflect(Component)]
 pub struct BrushStableId(u64);
 
 #[derive(Resource, Default)]
@@ -252,6 +258,23 @@ fn entity_by_stable_id(world: &mut World, id: BrushStableId) -> Option<Entity> {
         .iter(world)
         .find(|(_, sid)| **sid == id)
         .map(|(e, _)| e)
+}
+
+/// Lazily give every `Brush` a `BrushStableId` so the undo selection-restore
+/// path (`apply_ast_to_world`) can match selections across scene reloads.
+/// Brushes loaded from JSN carry the serialized id if they had one; fresh
+/// draws that didn't insert one explicitly get one here.
+fn assign_missing_brush_stable_ids(
+    mut commands: Commands,
+    mut counter: ResMut<StableIdCounter>,
+    brushes: Query<Entity, (With<crate::brush::Brush>, Without<BrushStableId>)>,
+) {
+    for entity in &brushes {
+        let sid = counter.next();
+        if let Ok(mut ec) = commands.get_entity(entity) {
+            ec.insert(sid);
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -484,7 +507,10 @@ pub(crate) struct CutPreviewHidden;
 impl Plugin for DrawBrushPlugin {
     fn build(&self, app: &mut App) {
         // TODO: Move *all* of this into the `extension` method and turn systems into ops on the way.
-        app.init_gizmo_group::<DrawBrushGizmoGroup>()
+        app.register_type::<BrushStableId>()
+            .init_resource::<StableIdCounter>()
+            .add_systems(Update, assign_missing_brush_stable_ids)
+            .init_gizmo_group::<DrawBrushGizmoGroup>()
             .add_systems(Startup, configure_draw_brush_gizmos)
             .add_systems(
                 Update,
@@ -1272,6 +1298,7 @@ fn spawn_drawn_brush(active: &ActiveDraw, commands: &mut Commands) {
             }
         }
 
+        let stable_id = world.resource_mut::<StableIdCounter>().next();
         let entity = world
             .spawn((
                 Name::new("Brush"),
@@ -1282,6 +1309,7 @@ fn spawn_drawn_brush(active: &ActiveDraw, commands: &mut Commands) {
                     scale: Vec3::ONE,
                 },
                 Visibility::default(),
+                stable_id,
             ))
             .id();
 
@@ -1683,6 +1711,7 @@ fn spawn_polygon_brush(active: &ActiveDraw, commands: &mut Commands) {
             }
         }
 
+        let stable_id = world.resource_mut::<StableIdCounter>().next();
         let entity = world
             .spawn((
                 Name::new("Brush"),
@@ -1693,6 +1722,7 @@ fn spawn_polygon_brush(active: &ActiveDraw, commands: &mut Commands) {
                     scale: Vec3::ONE,
                 },
                 Visibility::default(),
+                stable_id,
             ))
             .id();
 

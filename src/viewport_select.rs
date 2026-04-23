@@ -71,8 +71,21 @@ pub(crate) fn handle_viewport_click(
     mut commands: Commands,
     mut ray_cast: MeshRayCast,
     (mut group_edit, mut last_click, time): (ResMut<GroupEditState>, ResMut<LastClick>, Res<Time>),
+    // Tracks whether a draw-brush modal was active on the previous frame.
+    // `draw_brush.confirm` clears `draw_state.active` inline, so by the time
+    // this system runs on the same mouse-press that fired the confirm, the
+    // `guards.draw_state.active` check below would already pass — and a
+    // raycast-miss would then call `selection.clear()`, stripping `Selected`
+    // from the freshly-spawned brush. The Local bridges one frame: if a draw
+    // was active last frame but isn't now, the click that triggered the
+    // confirm also triggered us, and we must bail.
+    mut was_drawing: Local<bool>,
 ) {
     let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
+
+    let drawing_now = guards.draw_state.active.is_some();
+    let just_finished_draw = *was_drawing && !drawing_now;
+    *was_drawing = drawing_now;
 
     // Don't select during gizmo drag, modal ops, viewport drag, brush edit mode, draw mode,
     // terrain sculpt mode, or shift+click (which starts box select).
@@ -85,7 +98,8 @@ pub(crate) fn handle_viewport_click(
         || guards.modal.active.is_some()
         || guards.viewport_drag.active.is_some()
         || matches!(*guards.edit_mode, crate::brush::EditMode::BrushEdit(_))
-        || guards.draw_state.active.is_some()
+        || drawing_now
+        || just_finished_draw
         || matches!(
             *guards.terrain_edit_mode,
             crate::terrain::TerrainEditMode::Sculpt(_)

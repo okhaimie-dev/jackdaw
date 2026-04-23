@@ -1972,10 +1972,21 @@ pub(crate) fn refresh_enum_variants(
     // two queries can coexist  -- we only ever need to read the selected source
     // entity, never a UI container.
     entity_query: Query<bevy::ecs::world::EntityRef, Without<super::EnumVariantHost>>,
+    dirty_sources: Query<(), With<super::InspectorDirty>>,
 ) {
     let Some(primary) = selection.primary() else {
         return;
     };
+    // An inspector rebuild is pending for the primary selection. Skip
+    // this polling cycle — its queued spawns would race the rebuild's
+    // cascade-despawn of the existing display subtree and produce
+    // `ChildOf(X) relates to an entity that does not exist` WARNs
+    // when our new spawns reference containers that get torn down in
+    // the same flush. The mismatch we'd catch this frame will be
+    // rebuilt from scratch by `on_inspector_dirty` anyway.
+    if dirty_sources.contains(primary) {
+        return;
+    }
     let registry_guard = type_registry.read();
     let Ok(entity_ref) = entity_query.get(primary) else {
         return;

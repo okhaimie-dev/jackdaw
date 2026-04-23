@@ -49,7 +49,15 @@ const SKIP_COMPONENT_PATHS: &[&str] = &[
 
 /// Paths that override the skip prefixes  -- these are always saved even if
 /// they match a skip prefix.
-const ALWAYS_SAVE_PATHS: &[&str] = &["bevy_camera::visibility::Visibility"];
+const ALWAYS_SAVE_PATHS: &[&str] = &[
+    "bevy_camera::visibility::Visibility",
+    // Needed so `apply_ast_to_world` can match selected brushes across
+    // undo/redo by their stable id (`jackdaw::` is in the default skip
+    // list because most editor-only types shouldn't serialize, but
+    // `BrushStableId` is the exception — it's the persistent identity
+    // used to restore selection after a scene reload).
+    "jackdaw::draw_brush::BrushStableId",
+];
 
 pub fn should_skip_component(type_path: &str) -> bool {
     // Always-save takes priority over any skip rule
@@ -1774,6 +1782,23 @@ pub fn build_snapshot_ast(world: &mut World) -> jackdaw_jsn::SceneJsnAst {
 /// its own parallel spawn logic to maintain.
 pub fn apply_ast_to_world(world: &mut World, ast: &jackdaw_jsn::SceneJsnAst) {
     use jackdaw_jsn::format::JsnMetadata;
+    use std::collections::HashMap;
+
+    // Capture stable IDs of currently-selected entities before teardown.
+    // After the reload, we look these up against the freshly-spawned
+    // entities and re-insert `Selected` — that fires `On<Add, Selected>`
+    // → `add_component_displays`, which reinstalls `InspectorTarget` /
+    // `Monitor` / `NotifyAdded` on the Inspector pointing at the new
+    // entity and rebuilds the displays against the restored components.
+    // Without this, undo leaves the inspector bound to the old despawned
+    // entity and the user has to manually deselect+reselect to see the
+    // post-undo state.
+    let selected_stable_ids: Vec<crate::draw_brush::BrushStableId> = world
+        .resource::<crate::selection::Selection>()
+        .entities
+        .iter()
+        .filter_map(|&e| world.get::<crate::draw_brush::BrushStableId>(e).copied())
+        .collect();
 
     // Clear selection + tree rows before touching entities so observers
     // don't fire on stale references.
@@ -1808,6 +1833,31 @@ pub fn apply_ast_to_world(world: &mut World, ast: &jackdaw_jsn::SceneJsnAst) {
 
     *world.resource_mut::<jackdaw_jsn::SceneJsnAst>() =
         jackdaw_jsn::SceneJsnAst::from_jsn_scene(&scene, &spawned);
+
+    // Restore selection by stable ID. Walks `selected_stable_ids` in
+    // original order so `Selection.primary()` lands on the same brush
+    // it pointed at before the reload (important because
+    // `add_component_displays` inspects the primary).
+    if !selected_stable_ids.is_empty() {
+        let mut stable_to_entity: HashMap<crate::draw_brush::BrushStableId, Entity> =
+            HashMap::new();
+        let mut q = world.query::<(Entity, &crate::draw_brush::BrushStableId)>();
+        for (entity, sid) in q.iter(world) {
+            stable_to_entity.insert(*sid, entity);
+        }
+        let restored: Vec<Entity> = selected_stable_ids
+            .iter()
+            .filter_map(|sid| stable_to_entity.get(sid).copied())
+            .collect();
+        for &entity in &restored {
+            if let Ok(mut ec) = world.get_entity_mut(entity) {
+                ec.insert(crate::selection::Selected);
+            }
+        }
+        world
+            .resource_mut::<crate::selection::Selection>()
+            .entities = restored;
+    }
 }
 
 /// ISO 8601 timestamp (simplified  -- no chrono dependency).

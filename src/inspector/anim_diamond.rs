@@ -74,32 +74,42 @@ pub fn decorate_animatable_fields(
         // Node). Splitting it this way avoids the duplicate-Node
         // panic that happens when you stack a custom Node alongside
         // a bundle that already includes one.
+        //
+        // Attachment uses `attach_or_despawn` rather than raw
+        // `ChildOf(..)` to handle the race where `row_entity` was
+        // added this frame (so `Added<InspectorFieldRow>` matches
+        // it) but a concurrent inspector rebuild (`on_inspector_dirty`
+        // / `remove_component_displays`) cascade-despawns it before
+        // these spawn commands drain. Raw `ChildOf` would then log
+        // the `ChildOf(Xv0) relates to an entity that does not exist`
+        // WARN we were seeing once per animatable row per brush draw.
         let wrapper = commands
+            .spawn((Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(0.0),
+                right: Val::Px(4.0),
+                ..default()
+            },))
+            .id();
+
+        let button_entity = commands
             .spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    top: Val::Px(0.0),
-                    right: Val::Px(4.0),
-                    ..default()
+                AnimDiamondButton {
+                    source_entity: row.source_entity,
+                    component_type_path: row.type_path.clone(),
+                    field_path: row.field_path.clone(),
                 },
-                ChildOf(row_entity),
+                button(
+                    ButtonProps::new("")
+                        .with_variant(ButtonVariant::Ghost)
+                        .with_size(ButtonSize::IconSM)
+                        .with_left_icon(Icon::Diamond),
+                ),
             ))
             .id();
 
-        commands.spawn((
-            AnimDiamondButton {
-                source_entity: row.source_entity,
-                component_type_path: row.type_path.clone(),
-                field_path: row.field_path.clone(),
-            },
-            button(
-                ButtonProps::new("")
-                    .with_variant(ButtonVariant::Ghost)
-                    .with_size(ButtonSize::IconSM)
-                    .with_left_icon(Icon::Diamond),
-            ),
-            ChildOf(wrapper),
-        ));
+        jackdaw_feathers::utils::attach_or_despawn(&mut commands, wrapper, button_entity);
+        jackdaw_feathers::utils::attach_or_despawn(&mut commands, row_entity, wrapper);
     }
 }
 
