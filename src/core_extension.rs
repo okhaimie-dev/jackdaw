@@ -78,6 +78,7 @@ impl JackdawExtension for JackdawCoreExtension {
 
         ctx.register_operator::<CancelModalOp>();
         ctx.register_operator::<crate::asset_browser::ApplyTextureOp>();
+        crate::measure_tool::add_to_extension(ctx);
         crate::draw_brush::add_to_extension(ctx);
 
         crate::scene_ops::add_to_extension(ctx);
