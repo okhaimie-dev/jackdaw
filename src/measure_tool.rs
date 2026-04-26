@@ -88,20 +88,15 @@ fn measure_distance(
     mut state: ResMut<MeasureToolState>,
     mouse: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    windows: Query<&Window>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
+    window: Single<&Window>,
+    camera: Single<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
     viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
     mut ray_cast: MeshRayCast,
 ) -> OperatorResult {
-    let Ok(window) = windows.single() else {
-        return OperatorResult::Cancelled;
-    };
     let Some(cursor_pos) = window.cursor_position() else {
         return OperatorResult::Cancelled;
     };
-    let Ok((camera, cam_tf)) = camera_query.single() else {
-        return OperatorResult::Cancelled;
-    };
+    let (camera, cam_tf) = *camera;
     let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
     else {
         return OperatorResult::Cancelled;
@@ -214,7 +209,7 @@ fn update_measure_labels(
     mut commands: Commands,
     state: Res<MeasureToolState>,
     mut label_entities: ResMut<MeasureLabelEntities>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
+    camera: Single<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
     viewport_node: Query<&ComputedNode, With<SceneViewport>>,
     mut label_query: Query<(Entity, &mut Text, &mut Node, &mut Visibility), With<MeasureLabel>>,
     viewport_entity: Single<Entity, With<SceneViewport>>,
@@ -228,9 +223,7 @@ fn update_measure_labels(
         return;
     }
 
-    let Ok((camera, cam_tf)) = camera_query.single() else {
-        return;
-    };
+    let (camera, cam_tf) = *camera;
     let vp_node_size = viewport_node
         .single()
         .map(ComputedNode::size)
