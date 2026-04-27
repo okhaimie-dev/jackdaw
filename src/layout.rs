@@ -565,6 +565,12 @@ fn toolbar(icon_font: Handle<Font>) -> impl Bundle {
                 ActivateDrawBrushModalOp::LABEL
             ),
             toolbar_edit_button(
+                Icon::RulerDimensionLine,
+                EditToolButton::Operator("tools.measure_distance"),
+                f.clone(),
+                "Measure Distance"
+            ),
+            toolbar_edit_button(
                 Icon::CircleDot,
                 EditToolButton::Vertex,
                 f.clone(),

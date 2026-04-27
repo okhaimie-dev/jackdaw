@@ -49,6 +49,7 @@ fn configure_measure_tool_gizmos(mut config_store: ResMut<GizmoConfigStore>) {
 pub struct MeasureToolState {
     pub active: bool,
     pub initialized: bool,
+    has_start: bool,
     start_point: Vec3,
     end_point: Vec3,
 }
@@ -68,16 +69,20 @@ pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
     use bevy_enhanced_input::prelude::Press;
 
     ctx.entity_mut()
-        .with_related::<ActionOf<CoreExtensionInputContext>>((
-            Action::<MeasureDistanceOp>::new(),
-            bindings![(KeyCode::KeyM, Press::default())],
-        ));
+        .with_related::<ActionOf<CoreExtensionInputContext>>(
+            (
+                Action::<MeasureDistanceOp>::new(),
+                bindings![(KeyCode::KeyM, Press::default())],
+            )
+        );
 
     ctx.entity_mut()
-        .with_related::<ActionOf<CoreExtensionInputContext>>((
-            Action::<ConfirmMeasureDistanceOp>::new(),
-            bindings![(MouseButton::Left, Press::default())],
-        ));
+        .with_related::<ActionOf<CoreExtensionInputContext>>(
+            (
+                Action::<ConfirmMeasureDistanceOp>::new(),
+                bindings![(MouseButton::Left, Press::default())],
+            )
+        );
 
     ctx.register_operator::<MeasureDistanceOp>()
         .register_operator::<ConfirmMeasureDistanceOp>()
@@ -102,39 +107,41 @@ fn measure_distance(
     viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
     mut ray_cast: MeshRayCast,
 ) -> OperatorResult {
-    let Some(cursor_pos) = window.cursor_position() else {
-        return OperatorResult::Cancelled;
-    };
     let (camera, cam_tf) = *camera;
-    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
-    else {
-        return OperatorResult::Cancelled;
-    };
-    let Ok(ray) = camera.viewport_to_world(cam_tf, viewport_cursor) else {
-        return OperatorResult::Cancelled;
-    };
 
-    let current_point = raycast_closest_point(ray, &mut ray_cast)
-        .or_else(|| ray_plane_intersection(ray, Vec3::ZERO, Vec3::Y))
-        .unwrap_or(cam_tf.translation() + *ray.direction * 10.0);
+    // Try to get a world-space point under the cursor.
+    let current_point = window.cursor_position().and_then(|cursor_pos| {
+        let vp_cursor = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)?;
+        let ray = camera.viewport_to_world(cam_tf, vp_cursor).ok()?;
+        Some(
+            raycast_closest_point(ray, &mut ray_cast)
+                .or_else(|| ray_plane_intersection(ray, Vec3::ZERO, Vec3::Y))
+                .unwrap_or(cam_tf.translation() + *ray.direction * 10.0),
+        )
+    });
 
     if !state.initialized {
-        // First invocation: capture the start point and enter modal mode.
+        // First invocation: enter modal mode. Nothing is drawn until the first
+        // confirm click sets the start point.
+        let fallback = cam_tf.translation() + cam_tf.forward().as_vec3() * 5.0;
         state.initialized = true;
         state.active = true;
-        state.start_point = current_point;
-        state.end_point = current_point;
+        state.has_start = false;
+        state.end_point = current_point.unwrap_or(fallback);
         return OperatorResult::Running;
     }
 
     if !state.active {
-        // Confirm operator triggered finish.
+        // Confirm triggered finish — clean up and exit modal.
         state.initialized = false;
+        state.has_start = false;
         return OperatorResult::Finished;
     }
 
-    // Update the live end point every frame.
-    state.end_point = current_point;
+    // Track cursor while waiting for the first click or while measuring.
+    if let Some(point) = current_point {
+        state.end_point = point;
+    }
 
     OperatorResult::Running
 }
@@ -142,6 +149,7 @@ fn measure_distance(
 fn cancel_measure_distance(mut state: ResMut<MeasureToolState>) {
     state.active = false;
     state.initialized = false;
+    state.has_start = false;
 }
 
 fn measure_tool_active(state: Res<MeasureToolState>) -> bool {
@@ -151,7 +159,7 @@ fn measure_tool_active(state: Res<MeasureToolState>) -> bool {
 #[operator(
     id = "tools.measure_distance.confirm",
     label = "Confirm Measurement",
-    description = "Confirms the current distance measurement",
+    description = "First click sets the start point, second click finishes",
     is_available = measure_tool_active,
     allows_undo = false,
 )]
@@ -159,8 +167,20 @@ fn confirm_measure_distance(
     _: In<OperatorParameters>,
     mut state: ResMut<MeasureToolState>,
 ) -> OperatorResult {
-    state.active = false;
-    OperatorResult::Finished
+    if !state.active || !state.initialized {
+        return OperatorResult::Cancelled;
+    }
+
+    if !state.has_start {
+        // First click: capture start point and begin showing the line.
+        state.has_start = true;
+        state.start_point = state.end_point;
+        OperatorResult::Running
+    } else {
+        // Second click: finish the current measurement and reset for the next one.
+        state.has_start = false;
+        OperatorResult::Running
+    }
 }
 
 // ── Raycasting helpers ──
@@ -188,7 +208,7 @@ fn ray_plane_intersection(ray: Ray3d, plane_point: Vec3, plane_normal: Vec3) -> 
 // ── Viewport drawing ──
 
 fn draw_measure_line(mut gizmos: Gizmos<MeasureToolGizmoGroup>, state: Res<MeasureToolState>) {
-    if !state.active {
+    if !state.active || !state.has_start {
         return;
     }
 
@@ -261,7 +281,7 @@ fn update_measure_labels(
         return;
     };
 
-    if !state.active {
+    if !state.active || !state.has_start {
         *vis = Visibility::Hidden;
         return;
     }
