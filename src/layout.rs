@@ -788,7 +788,7 @@ fn toolbar_edit_button(
                 EditToolButton::Face => EditModeFaceOp::ID.into(),
                 EditToolButton::Clip => EditModeClipOp::ID.into(),
                 EditToolButton::Physics => unreachable!("handled above"),
-                EditToolButton::Operator(_) => unreachable!("handled above"),
+                EditToolButton::Operator(op) => op.into(),
             };
             commands
                 .operator(op_id)
