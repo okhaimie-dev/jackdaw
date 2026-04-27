@@ -44,6 +44,7 @@ fn configure_measure_tool_gizmos(mut config_store: ResMut<GizmoConfigStore>) {
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct MeasureToolState {
     pub active: bool,
+    pub initialized: bool,
     pub start_point: Vec3,
     pub end_point: Vec3,
 }
@@ -70,7 +71,14 @@ pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
             bindings![(KeyCode::KeyM, Press::default())],
         ));
 
+    ctx.entity_mut()
+        .with_related::<ActionOf<CoreExtensionInputContext>>((
+            Action::<ConfirmMeasureDistanceOp>::new(),
+            bindings![(MouseButton::Left, Press::default())],
+        ));
+
     ctx.register_operator::<MeasureDistanceOp>()
+        .register_operator::<ConfirmMeasureDistanceOp>()
         .menu_entry_for::<MeasureDistanceOp>("Tools");
 }
 
@@ -87,7 +95,6 @@ pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
 fn measure_distance(
     _: In<OperatorParameters>,
     mut state: ResMut<MeasureToolState>,
-    mouse: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
     viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
@@ -109,34 +116,49 @@ fn measure_distance(
         .or_else(|| ray_plane_intersection(ray, Vec3::ZERO, Vec3::Y))
         .unwrap_or(cam_tf.translation() + *ray.direction * 10.0);
 
-    if !state.active {
+    if !state.initialized {
         // First invocation: capture the start point and enter modal mode.
+        state.initialized = true;
         state.active = true;
         state.start_point = current_point;
         state.end_point = current_point;
         return OperatorResult::Running;
     }
 
-    // Update the live end point every frame.
-    state.end_point = current_point;
-
-    // Left-click commits the measurement.
-    if mouse.just_pressed(MouseButton::Left) {
-        state.active = false;
+    if !state.active {
+        // Confirm operator triggered finish.
+        state.initialized = false;
         return OperatorResult::Finished;
     }
 
-    // Escape cancels.
-    // if keyboard.just_pressed(KeyCode::Escape) {
-    //     state.active = false;
-    //     return OperatorResult::Cancelled;
-    // }
+    // Update the live end point every frame.
+    state.end_point = current_point;
 
     OperatorResult::Running
 }
 
 fn cancel_measure_distance(mut state: ResMut<MeasureToolState>) {
     state.active = false;
+    state.initialized = false;
+}
+
+fn measure_tool_active(state: Res<MeasureToolState>) -> bool {
+    state.active
+}
+
+#[operator(
+    id = "tools.measure_distance.confirm",
+    label = "Confirm Measurement",
+    description = "Confirms the current distance measurement",
+    is_available = measure_tool_active,
+    allows_undo = false,
+)]
+fn confirm_measure_distance(
+    _: In<OperatorParameters>,
+    mut state: ResMut<MeasureToolState>,
+) -> OperatorResult {
+    state.active = false;
+    OperatorResult::Finished
 }
 
 // ── Raycasting helpers ──
