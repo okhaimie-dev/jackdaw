@@ -764,6 +764,23 @@ fn toolbar_edit_button(
                 });
                 return;
             }
+            // For modal operators (Draw Brush, Measure Distance, etc.), cancel
+            // any active modal first so the user can switch tools without
+            // having to press Escape.
+            if let EditToolButton::Operator(op) = tool {
+                commands.queue(move |world: &mut World| {
+                    let _ = world.operator("modal.cancel").call();
+                    let _ = world
+                        .operator(op)
+                        .settings(CallOperatorSettings {
+                            execution_context: ExecutionContext::Invoke,
+                            creates_history_entry: true,
+                        })
+                        .call();
+                });
+                return;
+            }
+
             let op_id: Cow<'static, str> = match tool {
                 EditToolButton::Object => EditModeObjectOp::ID.into(),
                 EditToolButton::Vertex => EditModeVertexOp::ID.into(),
@@ -771,7 +788,7 @@ fn toolbar_edit_button(
                 EditToolButton::Face => EditModeFaceOp::ID.into(),
                 EditToolButton::Clip => EditModeClipOp::ID.into(),
                 EditToolButton::Physics => unreachable!("handled above"),
-                EditToolButton::Operator(op) => op.into(),
+                EditToolButton::Operator(_) => unreachable!("handled above"),
             };
             commands
                 .operator(op_id)
