@@ -4,9 +4,10 @@ use bevy::{
     ui::UiGlobalTransform,
 };
 use jackdaw_api::prelude::*;
+use jackdaw_feathers::tokens;
 
 use crate::{
-    JackdawDrawSystems,
+    JackdawDrawSystems, default_style,
     viewport::{MainViewportCamera, SceneViewport},
     viewport_util::window_to_viewport_cursor,
 };
@@ -87,7 +88,6 @@ fn measure_distance(
     _: In<OperatorParameters>,
     mut state: ResMut<MeasureToolState>,
     mouse: Res<ButtonInput<MouseButton>>,
-    keyboard: Res<ButtonInput<KeyCode>>,
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
     viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
@@ -127,10 +127,10 @@ fn measure_distance(
     }
 
     // Escape cancels.
-    if keyboard.just_pressed(KeyCode::Escape) {
-        state.active = false;
-        return OperatorResult::Cancelled;
-    }
+    // if keyboard.just_pressed(KeyCode::Escape) {
+    //     state.active = false;
+    //     return OperatorResult::Cancelled;
+    // }
 
     OperatorResult::Running
 }
@@ -143,19 +143,10 @@ fn cancel_measure_distance(mut state: ResMut<MeasureToolState>) {
 
 fn raycast_closest_point(ray: Ray3d, ray_cast: &mut MeshRayCast) -> Option<Vec3> {
     let settings = MeshRayCastSettings::default().with_visibility(RayCastVisibility::Any);
-    let mut closest: Option<(Vec3, f32)> = None;
-    for (_entity, hit_data) in ray_cast.cast_ray(ray, &settings) {
-        if hit_data.distance >= 0.0 {
-            match closest {
-                None => closest = Some((hit_data.point, hit_data.distance)),
-                Some((_, best_dist)) if hit_data.distance < best_dist => {
-                    closest = Some((hit_data.point, hit_data.distance));
-                }
-                _ => {}
-            }
-        }
-    }
-    closest.map(|(point, _)| point)
+    ray_cast
+        .cast_ray(ray, &settings)
+        .first()
+        .map(|(_, hit_data)| hit_data.point)
 }
 
 fn ray_plane_intersection(ray: Ray3d, plane_point: Vec3, plane_normal: Vec3) -> Option<Vec3> {
@@ -177,7 +168,7 @@ fn draw_measure_line(mut gizmos: Gizmos<MeasureToolGizmoGroup>, state: Res<Measu
         return;
     }
 
-    let color = crate::default_style::MEASURE_TOOL_LINE;
+    let color = default_style::MEASURE_TOOL_LINE;
     let start = state.start_point;
     let end = state.end_point;
 
@@ -185,21 +176,20 @@ fn draw_measure_line(mut gizmos: Gizmos<MeasureToolGizmoGroup>, state: Res<Measu
     gizmos.line(start, end, color);
 
     // Endpoint markers (small crosses)
-    let marker_size = 0.08;
     for point in [start, end] {
         gizmos.line(
-            point - Vec3::X * marker_size,
-            point + Vec3::X * marker_size,
+            point - Vec3::X * default_style::MARKER_SIZE,
+            point + Vec3::X * default_style::MARKER_SIZE,
             color,
         );
         gizmos.line(
-            point - Vec3::Y * marker_size,
-            point + Vec3::Y * marker_size,
+            point - Vec3::Y * default_style::MARKER_SIZE,
+            point + Vec3::Y * default_style::MARKER_SIZE,
             color,
         );
         gizmos.line(
-            point - Vec3::Z * marker_size,
-            point + Vec3::Z * marker_size,
+            point - Vec3::Z * default_style::MARKER_SIZE,
+            point + Vec3::Z * default_style::MARKER_SIZE,
             color,
         );
     }
@@ -210,7 +200,7 @@ fn update_measure_labels(
     state: Res<MeasureToolState>,
     mut label_entities: ResMut<MeasureLabelEntities>,
     camera: Single<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
-    viewport_node: Query<&ComputedNode, With<SceneViewport>>,
+    viewport_node: Option<Single<&ComputedNode, With<SceneViewport>>>,
     mut label_query: Query<(Entity, &mut Text, &mut Node, &mut Visibility), With<MeasureLabel>>,
     viewport_entity: Single<Entity, With<SceneViewport>>,
 ) {
@@ -224,10 +214,7 @@ fn update_measure_labels(
     }
 
     let (camera, cam_tf) = *camera;
-    let vp_node_size = viewport_node
-        .single()
-        .map(ComputedNode::size)
-        .unwrap_or(Vec2::ONE);
+    let vp_node_size = viewport_node.map(|node| node.size()).unwrap_or(Vec2::ONE);
     let render_target_size = camera.logical_viewport_size().unwrap_or(vp_node_size);
 
     let start = state.start_point;
@@ -246,8 +233,8 @@ fn update_measure_labels(
                     text.0 = text_content.to_string();
                     if let Ok(vp_coords) = camera.world_to_viewport(cam_tf, world_pos) {
                         let ui_pos = vp_coords * vp_node_size / render_target_size;
-                        node.left = Val::Px(ui_pos.x + 10.0);
-                        node.top = Val::Px(ui_pos.y - 10.0);
+                        node.left = px(ui_pos.x + 10.0);
+                        node.top = px(ui_pos.y - 10.0);
                         *vis = Visibility::Inherited;
                     } else {
                         *vis = Visibility::Hidden;
@@ -274,10 +261,10 @@ fn spawn_measure_label(commands: &mut Commands, viewport: Entity, text: &str) ->
             MeasureLabel,
             Text::new(text),
             TextFont {
-                font_size: 13.0,
+                font_size: tokens::TEXT_SIZE,
                 ..default()
             },
-            TextColor(crate::default_style::MEASURE_TOOL_LABEL),
+            TextColor(default_style::MEASURE_TOOL_LABEL),
             Node {
                 position_type: PositionType::Absolute,
                 ..default()
