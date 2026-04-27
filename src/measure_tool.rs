@@ -69,20 +69,16 @@ pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
     use bevy_enhanced_input::prelude::Press;
 
     ctx.entity_mut()
-        .with_related::<ActionOf<CoreExtensionInputContext>>(
-            (
-                Action::<MeasureDistanceOp>::new(),
-                bindings![(KeyCode::KeyM, Press::default())],
-            )
-        );
+        .with_related::<ActionOf<CoreExtensionInputContext>>((
+            Action::<MeasureDistanceOp>::new(),
+            bindings![(KeyCode::KeyM, Press::default())],
+        ));
 
     ctx.entity_mut()
-        .with_related::<ActionOf<CoreExtensionInputContext>>(
-            (
-                Action::<ConfirmMeasureDistanceOp>::new(),
-                bindings![(MouseButton::Left, Press::default())],
-            )
-        );
+        .with_related::<ActionOf<CoreExtensionInputContext>>((
+            Action::<ConfirmMeasureDistanceOp>::new(),
+            bindings![(MouseButton::Left, Press::default())],
+        ));
 
     ctx.register_operator::<MeasureDistanceOp>()
         .register_operator::<ConfirmMeasureDistanceOp>()
@@ -291,7 +287,9 @@ fn update_measure_labels(
         Some(node) => (node.size(), node.inverse_scale_factor()),
         None => (Vec2::ONE, 1.0),
     };
-    let render_target_size = camera.logical_viewport_size().unwrap_or(vp_node_size * scale);
+    let render_target_size = camera
+        .logical_viewport_size()
+        .unwrap_or(vp_node_size * scale);
 
     let start = state.start_point;
     let end = state.end_point;
