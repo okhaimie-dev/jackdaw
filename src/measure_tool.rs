@@ -23,6 +23,10 @@ impl Plugin for MeasureToolPlugin {
             .init_gizmo_group::<MeasureToolGizmoGroup>()
             .add_systems(Startup, configure_measure_tool_gizmos)
             .add_systems(
+                OnEnter(crate::AppState::Editor),
+                spawn_measure_label.after(crate::viewport::setup_viewport),
+            )
+            .add_systems(
                 PostUpdate,
                 (draw_measure_line, update_measure_labels)
                     .in_set(JackdawDrawSystems)
@@ -45,15 +49,13 @@ fn configure_measure_tool_gizmos(mut config_store: ResMut<GizmoConfigStore>) {
 pub struct MeasureToolState {
     pub active: bool,
     pub initialized: bool,
-    pub start_point: Vec3,
-    pub end_point: Vec3,
+    start_point: Vec3,
+    end_point: Vec3,
 }
 
 #[derive(Resource, Default)]
 struct MeasureLabelEntities {
-    distance: Option<Entity>,
-    start: Option<Entity>,
-    end: Option<Entity>,
+    label: Option<Entity>,
 }
 
 #[derive(Component)]
@@ -217,71 +219,17 @@ fn draw_measure_line(mut gizmos: Gizmos<MeasureToolGizmoGroup>, state: Res<Measu
     }
 }
 
-fn update_measure_labels(
+fn spawn_measure_label(
     mut commands: Commands,
-    state: Res<MeasureToolState>,
-    mut label_entities: ResMut<MeasureLabelEntities>,
-    camera: Single<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
-    viewport_node: Option<Single<&ComputedNode, With<SceneViewport>>>,
-    mut label_query: Query<(Entity, &mut Text, &mut Node, &mut Visibility), With<MeasureLabel>>,
     viewport_entity: Single<Entity, With<SceneViewport>>,
+    mut label_entities: ResMut<MeasureLabelEntities>,
 ) {
-    if !state.active {
-        // Tear down any labels that are still alive.
-        for (entity, _, _, _) in &mut label_query {
-            commands.entity(entity).despawn();
-        }
-        *label_entities = MeasureLabelEntities::default();
-        return;
-    }
-
-    let (camera, cam_tf) = *camera;
-    let vp_node_size = viewport_node.map(|node| node.size()).unwrap_or(Vec2::ONE);
-    let render_target_size = camera.logical_viewport_size().unwrap_or(vp_node_size);
-
-    let start = state.start_point;
-    let end = state.end_point;
-    let mid = (start + end) / 2.0;
-    let dist = start.distance(end);
-
-    let distance_text = format!("{:.2}", dist);
-    let start_text = format!("({:.2}, {:.2}, {:.2})", start.x, start.y, start.z);
-    let end_text = format!("({:.2}, {:.2}, {:.2})", end.x, end.y, end.z);
-
-    let mut update_label = |slot: &mut Option<Entity>, world_pos: Vec3, text_content: &str| {
-        let entity = if let Some(e) = *slot {
-            if label_query.contains(e) {
-                if let Ok((_, mut text, mut node, mut vis)) = label_query.get_mut(e) {
-                    text.0 = text_content.to_string();
-                    if let Ok(vp_coords) = camera.world_to_viewport(cam_tf, world_pos) {
-                        let ui_pos = vp_coords * vp_node_size / render_target_size;
-                        node.left = px(ui_pos.x + 10.0);
-                        node.top = px(ui_pos.y - 10.0);
-                        *vis = Visibility::Inherited;
-                    } else {
-                        *vis = Visibility::Hidden;
-                    }
-                }
-                e
-            } else {
-                spawn_measure_label(&mut commands, *viewport_entity, text_content)
-            }
-        } else {
-            spawn_measure_label(&mut commands, *viewport_entity, text_content)
-        };
-        *slot = Some(entity);
-    };
-
-    update_label(&mut label_entities.distance, mid, &distance_text);
-    update_label(&mut label_entities.start, start, &start_text);
-    update_label(&mut label_entities.end, end, &end_text);
-}
-
-fn spawn_measure_label(commands: &mut Commands, viewport: Entity, text: &str) -> Entity {
-    commands
+    let entity = commands
         .spawn((
             MeasureLabel,
-            Text::new(text),
+            crate::EditorEntity,
+            crate::NonSerializable,
+            Text::new(""),
             TextFont {
                 font_size: tokens::TEXT_SIZE,
                 ..default()
@@ -291,8 +239,53 @@ fn spawn_measure_label(commands: &mut Commands, viewport: Entity, text: &str) ->
                 position_type: PositionType::Absolute,
                 ..default()
             },
-            Visibility::Inherited,
+            Visibility::Hidden,
         ))
-        .insert(ChildOf(viewport))
-        .id()
+        .id();
+    commands.entity(*viewport_entity).add_child(entity);
+    label_entities.label = Some(entity);
+}
+
+fn update_measure_labels(
+    state: Res<MeasureToolState>,
+    label_entities: Res<MeasureLabelEntities>,
+    camera: Single<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
+    viewport_node: Option<Single<&ComputedNode, With<SceneViewport>>>,
+    mut label_query: Query<(&mut Text, &mut Node, &mut Visibility), With<MeasureLabel>>,
+) {
+    let Some(entity) = label_entities.label else {
+        return;
+    };
+
+    let Ok((mut text_comp, mut node, mut vis)) = label_query.get_mut(entity) else {
+        return;
+    };
+
+    if !state.active {
+        *vis = Visibility::Hidden;
+        return;
+    }
+
+    let (camera, cam_tf) = *camera;
+    let (vp_node_size, scale) = match &viewport_node {
+        Some(node) => (node.size(), node.inverse_scale_factor()),
+        None => (Vec2::ONE, 1.0),
+    };
+    let render_target_size = camera.logical_viewport_size().unwrap_or(vp_node_size * scale);
+
+    let start = state.start_point;
+    let end = state.end_point;
+    let mid = (start + end) / 2.0;
+    let dist = start.distance(end);
+
+    text_comp.0 = format!("{:.3} m", dist);
+
+    if let Ok(vp_coords) = camera.world_to_viewport(cam_tf, mid) {
+        let ui_pos = vp_coords * vp_node_size / render_target_size * scale;
+        node.left = px(ui_pos.x - 4.0);
+        node.top = px(ui_pos.y - 7.0);
+        *vis = Visibility::Inherited;
+    } else {
+        *vis = Visibility::Hidden;
+    }
 }
