@@ -16,13 +16,13 @@ use crate::{
     brush::{BrushEditMode, EditMode},
     draw_brush::{ActivateDrawBrushModalOp, DrawBrushState},
     edit_mode_ops::{
-        EditModeClipOp, EditModeEdgeOp, EditModeFaceOp, EditModeObjectOp, EditModePhysicsOp,
-        EditModeVertexOp,
+        EditModeClipOp, EditModeEdgeOp, EditModeFaceOp, EditModeObjectOp, EditModeVertexOp,
     },
     gizmo_ops::{GizmoModeRotateOp, GizmoModeScaleOp, GizmoModeTranslateOp, GizmoSpaceToggleOp},
     gizmos::{GizmoMode, GizmoSpace},
     hierarchy::{HierarchyPanel, HierarchyShowAllButton, HierarchyTreeContainer},
     inspector::Inspector,
+    physics_tool::PhysicsActivateOp,
     remote::ConnectionManager,
     viewport::SceneViewport,
 };
@@ -737,13 +737,34 @@ fn toolbar_edit_button(
             TextColor(tokens::TEXT_SECONDARY),
         )],
         observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
+            // Clicking the Physics button while active cancels the
+            // modal; re-dispatching would fail with ModalAlreadyActive.
+            if matches!(tool, EditToolButton::Physics) {
+                commands.queue(|world: &mut World| {
+                    let result = if *world.resource::<EditMode>() == EditMode::Physics {
+                        world.operator("modal.cancel").call()
+                    } else {
+                        world
+                            .operator(PhysicsActivateOp::ID)
+                            .settings(CallOperatorSettings {
+                                execution_context: ExecutionContext::Invoke,
+                                creates_history_entry: true,
+                            })
+                            .call()
+                    };
+                    if let Err(err) = result {
+                        error!("physics tool dispatch failed: {err}");
+                    }
+                });
+                return;
+            }
             let op_id: Cow<'static, str> = match tool {
                 EditToolButton::Object => EditModeObjectOp::ID.into(),
                 EditToolButton::Vertex => EditModeVertexOp::ID.into(),
                 EditToolButton::Edge => EditModeEdgeOp::ID.into(),
                 EditToolButton::Face => EditModeFaceOp::ID.into(),
                 EditToolButton::Clip => EditModeClipOp::ID.into(),
-                EditToolButton::Physics => EditModePhysicsOp::ID.into(),
+                EditToolButton::Physics => unreachable!("handled above"),
                 EditToolButton::Operator(op) => op.into(),
             };
             commands

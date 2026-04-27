@@ -71,7 +71,6 @@ impl Plugin for HierarchyPlugin {
                 Update,
                 (
                     apply_hierarchy_filter,
-                    cancel_inline_rename,
                     auto_focus_inline_rename,
                     handle_hierarchy_right_click.after(ContextMenuCloseSystems),
                     populate_template_dialog,
@@ -937,10 +936,10 @@ fn on_context_menu_action(
         }
         "hierarchy.rename" => {
             if let Some(target) = target_entity {
-                commands.trigger(TreeRowStartRename {
-                    entity: Entity::PLACEHOLDER,
-                    source_entity: target,
-                });
+                commands
+                    .operator(RenameBeginOp::ID)
+                    .param("entity", target.to_bits() as i64)
+                    .call();
             }
         }
         "hierarchy.duplicate" => {
@@ -1079,6 +1078,10 @@ fn on_visibility_toggled(
     });
 }
 
+pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
+    ctx.register_operator::<RenameBeginOp>();
+}
+
 /// Marker for inline rename `text_edit` entity, linking back to the label entity and source entity.
 #[derive(Component)]
 struct InlineRenameInput {
@@ -1086,93 +1089,114 @@ struct InlineRenameInput {
     source_entity: Entity,
 }
 
-/// Cancel inline rename on Escape key.
-fn cancel_inline_rename(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut commands: Commands,
-    rename_query: Query<(Entity, &InlineRenameInput)>,
-    names: Query<&Name>,
-    mut input_focus: ResMut<InputFocus>,
-) {
-    if !keyboard.just_pressed(KeyCode::Escape) {
-        return;
-    }
-    for (rename_entity, inline_rename) in &rename_query {
-        input_focus.clear();
+fn on_tree_row_start_rename(event: On<TreeRowStartRename>, mut commands: Commands) {
+    let target = event.source_entity;
+    commands
+        .operator(RenameBeginOp::ID)
+        .param("entity", target.to_bits() as i64)
+        .call();
+}
 
-        let original_name = names
-            .get(inline_rename.source_entity)
-            .map(|n| n.as_str().to_string())
-            .unwrap_or_default();
+/// `is_available` for `hierarchy.rename_begin`: only fires when no
+/// inline rename is already in progress.
+fn no_rename_in_progress(rename_check: Query<(), With<InlineRenameInput>>) -> bool {
+    rename_check.is_empty()
+}
 
-        // Unhide the label and restore its text
-        commands
-            .entity(inline_rename.label_entity)
-            .remove::<TreeRowInlineRename>();
-        if let Ok(mut ec) = commands.get_entity(inline_rename.label_entity) {
-            ec.insert(Text::new(original_name));
-            ec.entry::<Node>().and_modify(|mut node| {
-                node.display = Display::Flex;
-            });
+fn entity_name(names: &Query<&Name>, entity: Entity) -> String {
+    names
+        .get(entity)
+        .map(|n| n.as_str().to_string())
+        .unwrap_or_default()
+}
+
+/// Resolve the label entity and its containing row for a scene entity's tree node.
+fn find_rename_targets(
+    source: Entity,
+    tree_index: &TreeIndex,
+    tree_nodes: &Query<&Children, With<TreeNode>>,
+    content_query: &Query<(Entity, &Children), With<TreeRowContent>>,
+    label_query: &Query<Entity, With<TreeRowLabel>>,
+) -> Option<(Entity, Entity)> {
+    let tree_entity = tree_index.get(source)?;
+    let children = tree_nodes.get(tree_entity).ok()?;
+    for child in children.iter() {
+        if let Ok((content_e, content_children)) = content_query.get(child) {
+            for grandchild in content_children.iter() {
+                if label_query.contains(grandchild) {
+                    return Some((grandchild, content_e));
+                }
+            }
         }
+    }
+    None
+}
 
-        // Despawn the rename text_edit entity
-        commands.entity(rename_entity).despawn();
+/// Custom command: drop the inline-rename marker from a tree-row label
+/// and restore its displayed text + visibility. Issued from rename
+/// commit/cancel paths so the queue boundary is explicit.
+struct RestoreLabel {
+    label_entity: Entity,
+    text: String,
+}
+
+impl Command for RestoreLabel {
+    fn apply(self, world: &mut World) {
+        let Ok(mut ec) = world.get_entity_mut(self.label_entity) else {
+            return;
+        };
+        ec.remove::<TreeRowInlineRename>();
+        ec.insert(Text::new(self.text));
+        if let Some(mut node) = ec.get_mut::<Node>() {
+            node.display = Display::Flex;
+        }
     }
 }
 
-/// Start inline rename: hide the label and spawn a `text_edit` sibling.
-fn on_tree_row_start_rename(
-    event: On<TreeRowStartRename>,
+/// Begin inline rename of an entity in the hierarchy tree.
+///
+/// # Parameters
+/// - `entity`: the scene entity to rename, encoded via [`Entity::to_bits()`].
+#[operator(
+    id = "hierarchy.rename_begin",
+    label = "Rename Entity",
+    description = "Rename the selected entity in the hierarchy.",
+    modal = true,
+    cancel = cancel_rename_begin,
+    is_available = no_rename_in_progress,
+)]
+pub(crate) fn rename_begin(
+    params: In<OperatorParameters>,
     mut commands: Commands,
     tree_index: Res<TreeIndex>,
     tree_nodes: Query<&Children, With<TreeNode>>,
     content_query: Query<(Entity, &Children), With<TreeRowContent>>,
     label_query: Query<Entity, With<TreeRowLabel>>,
     names: Query<&Name>,
-    rename_check: Query<(), With<InlineRenameInput>>,
-) {
-    let source = event.source_entity;
-
-    // Don't start a rename if one is already active
-    if !rename_check.is_empty() {
-        return;
+    rename_inputs: Query<(), With<InlineRenameInput>>,
+    active: ActiveModalQuery,
+) -> OperatorResult {
+    if active.is_modal_running() {
+        return if rename_inputs.is_empty() {
+            OperatorResult::Finished
+        } else {
+            OperatorResult::Running
+        };
     }
 
-    let Some(tree_entity) = tree_index.get(source) else {
-        return;
+    let Some(source) = params.as_entity("entity") else {
+        return OperatorResult::Cancelled;
     };
-    let Ok(children) = tree_nodes.get(tree_entity) else {
-        return;
-    };
-
-    // Find the TreeRowContent entity and the TreeRowLabel entity within it
-    let mut label_entity = None;
-    let mut content_entity = None;
-    for child in children.iter() {
-        if let Ok((content_e, content_children)) = content_query.get(child) {
-            for grandchild in content_children.iter() {
-                if label_query.contains(grandchild) {
-                    label_entity = Some(grandchild);
-                    content_entity = Some(content_e);
-                    break;
-                }
-            }
-        }
-    }
-    let Some(label_entity) = label_entity else {
-        return;
-    };
-    let Some(content_entity) = content_entity else {
-        return;
+    let Some((label_entity, content_entity)) = find_rename_targets(
+        source,
+        &tree_index,
+        &tree_nodes,
+        &content_query,
+        &label_query,
+    ) else {
+        return OperatorResult::Cancelled;
     };
 
-    let current_name = names
-        .get(source)
-        .map(|n| n.as_str().to_string())
-        .unwrap_or_default();
-
-    // Hide the label and mark it so we can restore later
     commands.entity(label_entity).insert(TreeRowInlineRename);
     commands
         .entity(label_entity)
@@ -1181,7 +1205,6 @@ fn on_tree_row_start_rename(
             node.display = Display::None;
         });
 
-    // Spawn the text_edit as a sibling inside the content entity
     commands.spawn((
         InlineRenameInput {
             label_entity,
@@ -1189,11 +1212,29 @@ fn on_tree_row_start_rename(
         },
         text_edit::text_edit(
             TextEditProps::default()
-                .with_default_value(current_name)
+                .with_default_value(entity_name(&names, source))
                 .allow_empty(),
         ),
         ChildOf(content_entity),
     ));
+    OperatorResult::Running
+}
+
+fn cancel_rename_begin(
+    mut commands: Commands,
+    rename_query: Query<(Entity, &InlineRenameInput)>,
+    names: Query<&Name>,
+    mut input_focus: ResMut<InputFocus>,
+) {
+    for (rename_entity, inline_rename) in &rename_query {
+        input_focus.clear();
+        let original = entity_name(&names, inline_rename.source_entity);
+        commands.queue(RestoreLabel {
+            label_entity: inline_rename.label_entity,
+            text: original,
+        });
+        commands.entity(rename_entity).despawn();
+    }
 }
 
 /// Auto-focus inline rename `text_edit` inputs one frame after spawn.
@@ -1259,22 +1300,10 @@ fn handle_inline_rename_commit(
     };
 
     input_focus.clear();
-
-    // Restore label
-    commands
-        .entity(label_entity)
-        .remove::<TreeRowInlineRename>();
-    commands
-        .entity(label_entity)
-        .insert(Text::new(event.text.clone()));
-    commands
-        .entity(label_entity)
-        .entry::<Node>()
-        .and_modify(|mut node| {
-            node.display = Display::Flex;
-        });
-
-    // Despawn the rename text_edit entity
+    commands.queue(RestoreLabel {
+        label_entity,
+        text: event.text.clone(),
+    });
     commands.entity(rename_entity).despawn();
 
     // Trigger the rename

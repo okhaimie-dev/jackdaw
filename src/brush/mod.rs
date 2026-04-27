@@ -2,7 +2,7 @@ mod csg;
 mod geometry;
 mod gizmo_overlay;
 mod hull;
-mod interaction;
+pub(crate) mod interaction;
 pub(crate) mod mesh;
 
 use bevy::prelude::*;
@@ -15,8 +15,10 @@ pub use self::csg::{
 };
 pub use self::geometry::{compute_brush_geometry, compute_face_tangent_axes};
 pub use self::hull::HullFace;
-pub(crate) use self::hull::merge_hull_triangles;
-pub(crate) use self::interaction::{BrushDragState, ClipState, EdgeDragState, VertexDragState};
+pub(crate) use self::hull::{merge_hull_triangles, rebuild_brush_from_vertices};
+pub(crate) use self::interaction::{
+    BrushDragState, ClipMode, ClipState, EdgeDragState, VertexDragState,
+};
 pub use jackdaw_jsn::{Brush, BrushFaceData, BrushPlane};
 
 /// Cached computed geometry (NOT serialized, rebuilt from Brush).
@@ -68,6 +70,18 @@ pub struct BrushSelection {
     /// Remembered face from the last time face mode was exited (for extend-to-brush fallback).
     pub last_face_entity: Option<Entity>,
     pub last_face_index: Option<usize>,
+}
+
+impl BrushSelection {
+    /// Clear the active selection (entity + faces + vertices + edges).
+    /// Leaves `last_face_*` untouched so the extend-to-brush fallback
+    /// still works after deselecting.
+    pub fn clear(&mut self) {
+        self.entity = None;
+        self.faces.clear();
+        self.vertices.clear();
+        self.edges.clear();
+    }
 }
 
 /// Intent for face hover highlight color.
@@ -206,12 +220,12 @@ impl Plugin for BrushPlugin {
             .add_systems(
                 Update,
                 (
-                    interaction::handle_edit_mode_keys,
+                    interaction::drop_brush_edit_on_deselect,
                     interaction::brush_face_hover,
-                    interaction::brush_face_interact,
-                    interaction::brush_vertex_interact,
-                    interaction::brush_edge_interact,
-                    interaction::handle_brush_delete,
+                    crate::brush_drag_ops::face_drag_invoke_trigger,
+                    crate::brush_drag_ops::vertex_drag_invoke_trigger,
+                    crate::brush_drag_ops::edge_drag_invoke_trigger,
+                    crate::clip_ops::place_point_invoke_trigger,
                     interaction::handle_clip_mode,
                 )
                     .chain()

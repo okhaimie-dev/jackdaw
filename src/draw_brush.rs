@@ -31,21 +31,71 @@ use jackdaw_geometry::{
 use jackdaw_jsn::{Brush, BrushFaceData, BrushGroup, BrushPlane};
 
 pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
-    ctx.entity_mut()
-        .with_related::<ActionOf<CoreExtensionInputContext>>((
-            Action::<ConfirmDrawBrushOp>::new(),
-            bindings![(MouseButton::Left, Press::default()),],
-        ))
-        .with_related::<ActionOf<CoreExtensionInputContext>>((
-            Action::<ActivateDrawBrushModalOp>::new(),
-            bindings![
-                (MouseButton::Back, Press::default()),
-                (KeyCode::KeyB, Press::default()),
-            ],
-        ));
+    let ext = ctx.id();
+    ctx.spawn((
+        Action::<ConfirmDrawBrushOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![(MouseButton::Left, Press::default()),],
+    ));
+    ctx.spawn((
+        Action::<ActivateDrawBrushModalOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![
+            (MouseButton::Back, Press::default()),
+            (KeyCode::KeyB, Press::default()),
+        ],
+    ));
+    ctx.spawn((
+        Action::<BrushJoinOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![KeyCode::KeyJ],
+    ));
+    ctx.spawn((
+        Action::<BrushCsgSubtractOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![KeyCode::KeyK.with_mod_keys(ModKeys::CONTROL)],
+    ));
+    ctx.spawn((
+        Action::<BrushCsgIntersectOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![KeyCode::KeyK.with_mod_keys(ModKeys::CONTROL | ModKeys::SHIFT)],
+    ));
+    ctx.spawn((
+        Action::<BrushExtendFaceToBrushOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![KeyCode::KeyE.with_mod_keys(ModKeys::CONTROL)],
+    ));
+    ctx.spawn((
+        Action::<DrawBrushToggleModeOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![(KeyCode::Tab, Press::default())],
+    ));
+    ctx.spawn((
+        Action::<DrawBrushCommitPolygonOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![(KeyCode::Enter, Press::default())],
+    ));
+    ctx.spawn((
+        Action::<DrawBrushRemoveLastVertexOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![(KeyCode::Backspace, Press::default())],
+    ));
+    ctx.spawn((
+        Action::<DrawBrushCancelCutOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![(MouseButton::Right, Press::default())],
+    ));
     ctx.register_operator::<ActivateDrawBrushModalOp>()
         .register_operator::<AddBrushOp>()
         .register_operator::<ConfirmDrawBrushOp>()
+        .register_operator::<BrushJoinOp>()
+        .register_operator::<BrushCsgSubtractOp>()
+        .register_operator::<BrushCsgIntersectOp>()
+        .register_operator::<BrushExtendFaceToBrushOp>()
+        .register_operator::<DrawBrushToggleModeOp>()
+        .register_operator::<DrawBrushCommitPolygonOp>()
+        .register_operator::<DrawBrushRemoveLastVertexOp>()
+        .register_operator::<DrawBrushCancelCutOp>()
         .register_menu_entry(MenuEntryDescriptor {
             menu: "Add".to_string(),
             label: ActivateDrawBrushModalOp::LABEL.to_string(),
@@ -110,6 +160,134 @@ pub fn activate_draw_brush_modal(
 
 fn cancel_draw_brush_modal(mut draw_state: ResMut<DrawBrushState>) {
     draw_state.active = None;
+}
+
+/// True only while a draw is in progress and the input field isn't
+/// focused. Used as `is_available` for the in-modal keybinds.
+fn is_drawing(input_focus: Res<InputFocus>, draw_state: Res<DrawBrushState>) -> bool {
+    input_focus.0.is_none() && draw_state.active.is_some()
+}
+
+/// True while a draw's polygon is being placed (multi-vertex Add/Cut
+/// before Enter commits the shape).
+fn is_drawing_polygon(input_focus: Res<InputFocus>, draw_state: Res<DrawBrushState>) -> bool {
+    if input_focus.0.is_some() {
+        return false;
+    }
+    draw_state
+        .active
+        .as_ref()
+        .is_some_and(|a| a.phase == DrawPhase::DrawingPolygon)
+}
+
+/// True while a Cut-mode draw is in progress. Cut doesn't go through
+/// the modal-finalize path on cancel, so it gets its own RMB binding.
+fn is_drawing_cut(input_focus: Res<InputFocus>, draw_state: Res<DrawBrushState>) -> bool {
+    if input_focus.0.is_some() {
+        return false;
+    }
+    draw_state
+        .active
+        .as_ref()
+        .is_some_and(|a| a.mode == DrawMode::Cut)
+}
+
+/// Flip the in-progress draw between Add and Cut.
+#[operator(
+    id = "viewport.draw_brush.toggle_mode",
+    label = "Toggle Add/Cut",
+    description = "Flip between adding and cutting while drawing.",
+    is_available = is_drawing,
+    allows_undo = false,
+)]
+pub(crate) fn draw_brush_toggle_mode(
+    _: In<OperatorParameters>,
+    mut draw_state: ResMut<DrawBrushState>,
+) -> OperatorResult {
+    let Some(ref mut active) = draw_state.active else {
+        return OperatorResult::Cancelled;
+    };
+    active.mode = match active.mode {
+        DrawMode::Add => DrawMode::Cut,
+        DrawMode::Cut => DrawMode::Add,
+    };
+    OperatorResult::Finished
+}
+
+/// Close the in-progress polygon (via convex hull) and switch to
+/// extruding depth.
+#[operator(
+    id = "viewport.draw_brush.commit_polygon",
+    label = "Commit Polygon",
+    description = "Close the polygon and start extruding it.",
+    is_available = is_drawing_polygon,
+    allows_undo = false,
+)]
+pub(crate) fn draw_brush_commit_polygon(
+    _: In<OperatorParameters>,
+    mut draw_state: ResMut<DrawBrushState>,
+    windows: Query<&Window>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
+    viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
+) -> OperatorResult {
+    let Some(ref mut active) = draw_state.active else {
+        return OperatorResult::Cancelled;
+    };
+    let hull = convex_hull_on_plane(&active.polygon_vertices, &active.plane);
+    if hull.len() < 3 {
+        return OperatorResult::Cancelled;
+    }
+    active.polygon_vertices = hull;
+    let viewport_cursor = (|| {
+        let window = windows.single().ok()?;
+        let cursor_pos = window.cursor_position()?;
+        let (camera, _) = camera_query.single().ok()?;
+        window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
+    })();
+    active.phase = DrawPhase::ExtrudingDepth;
+    active.extrude_start_cursor = viewport_cursor.unwrap_or(Vec2::ZERO);
+    active.depth = 0.0;
+    OperatorResult::Finished
+}
+
+/// Drop the last placed polygon vertex, falling back to first-corner
+/// placement if the polygon is now empty.
+#[operator(
+    id = "viewport.draw_brush.remove_last_vertex",
+    label = "Remove Last Vertex",
+    description = "Take back the last polygon point you placed.",
+    is_available = is_drawing_polygon,
+    allows_undo = false,
+)]
+pub(crate) fn draw_brush_remove_last_vertex(
+    _: In<OperatorParameters>,
+    mut draw_state: ResMut<DrawBrushState>,
+) -> OperatorResult {
+    let Some(ref mut active) = draw_state.active else {
+        return OperatorResult::Cancelled;
+    };
+    active.polygon_vertices.pop();
+    if active.polygon_vertices.is_empty() {
+        active.phase = DrawPhase::PlacingFirstCorner;
+    }
+    OperatorResult::Finished
+}
+
+/// Cancel an in-progress Cut-mode draw. (Add-mode cancels through
+/// `modal.cancel`, which routes to the modal's finalize path.)
+#[operator(
+    id = "viewport.draw_brush.cancel_cut",
+    label = "Cancel Cut",
+    description = "Bail out of the current cut.",
+    is_available = is_drawing_cut,
+    allows_undo = false,
+)]
+pub(crate) fn draw_brush_cancel_cut(
+    _: In<OperatorParameters>,
+    mut draw_state: ResMut<DrawBrushState>,
+) -> OperatorResult {
+    draw_state.active = None;
+    OperatorResult::Finished
 }
 
 #[operator(
@@ -516,11 +694,6 @@ impl Plugin for DrawBrushPlugin {
                     draw_brush_update,
                     draw_brush_release,
                     draw_brush_confirm,
-                    draw_brush_cancel,
-                    join_selected_brushes,
-                    csg_subtract_selected,
-                    csg_intersect_selected,
-                    extend_face_to_brush,
                 )
                     .chain()
                     .in_set(crate::EditorInteractionSystems),
@@ -528,7 +701,7 @@ impl Plugin for DrawBrushPlugin {
             .add_systems(
                 Update,
                 (
-                    draw_brush_preview.after(draw_brush_cancel),
+                    draw_brush_preview.after(draw_brush_confirm),
                     manage_draw_preview_mesh.after(crate::brush::mesh::regenerate_brush_meshes),
                 )
                     .run_if(in_state(crate::AppState::Editor)),
@@ -541,9 +714,14 @@ fn configure_draw_brush_gizmos(mut config_store: ResMut<GizmoConfigStore>) {
     config.depth_bias = -1.0;
 }
 
+// TODO: Alt+B (append) and C (Cut start) still trigger via this
+// system because the modal `viewport.draw_brush_modal` doesn't yet
+// take parameters; folding those into BEI bindings needs the modal to
+// accept a `mode` / `append` param so a single op can serve all three
+// entry points. Bare B is handled by `viewport.draw_brush_modal`'s
+// own binding (registered in `add_to_extension`).
 fn draw_brush_activate(
     keyboard: Res<ButtonInput<KeyCode>>,
-    keybinds: Res<crate::keybinds::KeybindRegistry>,
     input_focus: Res<InputFocus>,
     mut draw_state: ResMut<DrawBrushState>,
     modal: Res<crate::modal_transform::ModalTransformState>,
@@ -552,24 +730,18 @@ fn draw_brush_activate(
     selection: Res<Selection>,
     brush_query: Query<(), With<Brush>>,
 ) {
-    use crate::keybinds::EditorAction;
-
-    // Handle Tab toggle while in draw mode (works in all phases)
-    if let Some(ref mut active) = draw_state.active {
-        if keybinds.just_pressed(EditorAction::ToggleDrawMode, &keyboard) {
-            active.mode = match active.mode {
-                DrawMode::Add => DrawMode::Cut,
-                DrawMode::Cut => DrawMode::Add,
-            };
-        }
+    if draw_state.active.is_some() {
         return;
     }
 
-    // B or Mouse4 = draw in Add mode, Alt+B = append to brush, C = draw in Cut mode
-    let append = keybinds.just_pressed(EditorAction::AppendToBrush, &keyboard);
-    let mode = if append {
+    // Alt+B = append to selected brush, C = Cut. (Bare B is handled
+    // by the BEI binding on `viewport.draw_brush_modal`.)
+    let alt = keyboard.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
+    let pressed_b = keyboard.just_pressed(KeyCode::KeyB);
+    let append = pressed_b && alt;
+    let mode = if pressed_b && alt {
         DrawMode::Add
-    } else if keybinds.just_pressed(EditorAction::DrawCut, &keyboard) {
+    } else if keyboard.just_pressed(KeyCode::KeyC) {
         DrawMode::Cut
     } else {
         return;
@@ -1013,66 +1185,9 @@ fn draw_brush_confirm(
     }
 }
 
-fn draw_brush_cancel(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mouse: Res<ButtonInput<MouseButton>>,
-    keybinds: Res<crate::keybinds::KeybindRegistry>,
-    mut draw_state: ResMut<DrawBrushState>,
-    windows: Query<&Window>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<MainViewportCamera>>,
-    viewport_query: Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,
-) {
-    use crate::keybinds::EditorAction;
-
-    let Some(ref mut active) = draw_state.active else {
-        return;
-    };
-
-    // Polygon mode: Enter closes the polygon (via convex hull) and
-    // transitions to ExtrudingDepth, Backspace removes the last
-    // placed vertex. Lives outside the operator framework for now
-    // and runs in both Add and Cut modes — the Add-mode operator
-    // migration stopped short of migrating these keybinds.
-    if active.phase == DrawPhase::DrawingPolygon {
-        if keybinds.just_pressed(EditorAction::ClosePolygon, &keyboard) {
-            let hull = convex_hull_on_plane(&active.polygon_vertices, &active.plane);
-            if hull.len() >= 3 {
-                active.polygon_vertices = hull;
-                let viewport_cursor = (|| {
-                    let window = windows.single().ok()?;
-                    let cursor_pos = window.cursor_position()?;
-                    let (camera, _) = camera_query.single().ok()?;
-                    window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
-                })();
-                active.phase = DrawPhase::ExtrudingDepth;
-                active.extrude_start_cursor = viewport_cursor.unwrap_or(Vec2::ZERO);
-                active.depth = 0.0;
-                return;
-            }
-        }
-        if keybinds.just_pressed(EditorAction::RemoveLastVertex, &keyboard) {
-            active.polygon_vertices.pop();
-            if active.polygon_vertices.is_empty() {
-                active.phase = DrawPhase::PlacingFirstCorner;
-            }
-            return;
-        }
-    }
-
-    // Add-mode cancel is handled by the `CancelModalOp` operator
-    // (bound to Esc via the core extension) so it goes through the
-    // proper modal-finalize path. Right-click-to-cancel is still
-    // only wired up for Cut mode.
-    if active.mode == DrawMode::Add {
-        return;
-    }
-
-    if keybinds.just_pressed(EditorAction::CancelDraw, &keyboard)
-        || mouse.just_pressed(MouseButton::Right)
-    {
-        draw_state.active = None;
-    }
-}
+// Enter / Backspace / RMB / Escape during a draw are all handled via
+// BEI bindings on the `viewport.draw_brush.*` operators registered in
+// `add_to_extension` (and `modal.cancel` for the Add-mode Escape).
 
 fn draw_brush_preview(
     draw_state: Res<DrawBrushState>,
@@ -2175,7 +2290,7 @@ fn build_cutter_planes_polygon(active: &ActiveDraw) -> Vec<BrushFaceData> {
 }
 
 /// If `entity` is a child of a `BrushGroup`, return (`parent_entity`, `parent_translation`).
-fn brush_parent_group(world: &World, entity: Entity) -> Option<(Entity, Vec3)> {
+pub(crate) fn brush_parent_group(world: &World, entity: Entity) -> Option<(Entity, Vec3)> {
     let parent = world.get::<ChildOf>(entity)?.0;
     world.get::<BrushGroup>(parent)?;
     let translation = world.get::<GlobalTransform>(parent)?.translation();
@@ -2476,26 +2591,6 @@ impl EditorCommand for SubtractBrushCommand {
     }
 }
 
-fn join_selected_brushes(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    keybinds: Res<crate::keybinds::KeybindRegistry>,
-    input_focus: Res<InputFocus>,
-    modal: Res<crate::modal_transform::ModalTransformState>,
-    draw_state: Res<DrawBrushState>,
-    mut commands: Commands,
-) {
-    use crate::keybinds::EditorAction;
-
-    if !keybinds.just_pressed(EditorAction::JoinBrushes, &keyboard) {
-        return;
-    }
-    if input_focus.0.is_some() || modal.active.is_some() || draw_state.active.is_some() {
-        return;
-    }
-
-    commands.queue(join_selected_brushes_impl);
-}
-
 /// Core logic for Join (convex merge). Callable from both keyboard shortcut and menu.
 pub(crate) fn join_selected_brushes_impl(world: &mut World) {
     let candidates: Vec<Entity> = world.resource::<Selection>().entities.clone();
@@ -2707,26 +2802,6 @@ pub(crate) fn join_selected_brushes_impl(world: &mut World) {
             label: "Join brushes".to_string(),
         }));
     }
-}
-
-fn csg_subtract_selected(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    keybinds: Res<crate::keybinds::KeybindRegistry>,
-    input_focus: Res<InputFocus>,
-    modal: Res<crate::modal_transform::ModalTransformState>,
-    draw_state: Res<DrawBrushState>,
-    mut commands: Commands,
-) {
-    use crate::keybinds::EditorAction;
-
-    if !keybinds.just_pressed(EditorAction::CsgSubtract, &keyboard) {
-        return;
-    }
-    if input_focus.0.is_some() || modal.active.is_some() || draw_state.active.is_some() {
-        return;
-    }
-
-    commands.queue(csg_subtract_selected_impl);
 }
 
 /// Core logic for CSG Subtract. Selected brushes are cutters, non-selected are targets.
@@ -2981,26 +3056,6 @@ pub(crate) fn csg_subtract_selected_impl(world: &mut World) {
     history.push_executed(Box::new(cmd));
 }
 
-fn csg_intersect_selected(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    keybinds: Res<crate::keybinds::KeybindRegistry>,
-    input_focus: Res<InputFocus>,
-    modal: Res<crate::modal_transform::ModalTransformState>,
-    draw_state: Res<DrawBrushState>,
-    mut commands: Commands,
-) {
-    use crate::keybinds::EditorAction;
-
-    if !keybinds.just_pressed(EditorAction::CsgIntersect, &keyboard) {
-        return;
-    }
-    if input_focus.0.is_some() || modal.active.is_some() || draw_state.active.is_some() {
-        return;
-    }
-
-    commands.queue(csg_intersect_selected_impl);
-}
-
 /// Core logic for CSG Intersect. Replaces all selected brushes with their intersection.
 pub(crate) fn csg_intersect_selected_impl(world: &mut World) {
     let selection = world.resource::<Selection>();
@@ -3113,12 +3168,142 @@ pub(crate) fn csg_intersect_selected_impl(world: &mut World) {
     history.push_executed(Box::new(cmd));
 }
 
-fn extend_face_to_brush(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    keybinds: Res<crate::keybinds::KeybindRegistry>,
+#[operator(
+    id = "brush.join",
+    label = "Join (Convex Merge)",
+    description = "Merge all selected brushes into a single convex-hull brush. \
+                   Requires at least two `Brush` entities in \
+                   `Selection::entities`; availability (`can_run_binary_brush_op`) \
+                   is false otherwise. The first selected brush keeps its entity \
+                   id and transform; others are despawned.",
+    is_available = can_run_binary_brush_op,
+)]
+pub(crate) fn brush_join(_: In<OperatorParameters>, mut commands: Commands) -> OperatorResult {
+    commands.queue(join_selected_brushes_impl);
+    OperatorResult::Finished
+}
+
+#[operator(
+    id = "brush.csg_subtract",
+    label = "CSG Subtract",
+    description = "Subtract the non-first selected brushes from the first. \
+                   Requires at least two `Brush` entities in `Selection::entities` \
+                   (first is the target, rest are cutters); availability \
+                   (`can_run_binary_brush_op`) is false otherwise. The target may \
+                   be split into multiple fragment brushes.",
+    is_available = can_run_binary_brush_op,
+)]
+pub(crate) fn brush_csg_subtract(
+    _: In<OperatorParameters>,
+    mut commands: Commands,
+) -> OperatorResult {
+    commands.queue(csg_subtract_selected_impl);
+    OperatorResult::Finished
+}
+
+#[operator(
+    id = "brush.csg_intersect",
+    label = "CSG Intersect",
+    description = "Replace the selected brushes with the solid shared by all of \
+                   them. Requires at least two `Brush` entities in \
+                   `Selection::entities`; availability \
+                   (`can_run_binary_brush_op`) is false otherwise. When the \
+                   intersection is empty the impl exits silently without \
+                   mutating the world.",
+    is_available = can_run_binary_brush_op,
+)]
+pub(crate) fn brush_csg_intersect(
+    _: In<OperatorParameters>,
+    mut commands: Commands,
+) -> OperatorResult {
+    commands.queue(csg_intersect_selected_impl);
+    OperatorResult::Finished
+}
+
+/// Shared environment gate: brush-level operators never run mid-draw,
+/// mid-modal, or while a text input is focused. Each specific op
+/// composes this with its own selection-state precondition check.
+fn env_allows_brush_op(
+    input_focus: &InputFocus,
+    modal: &crate::modal_transform::ModalTransformState,
+    draw_state: &DrawBrushState,
+) -> bool {
+    input_focus.0.is_none() && modal.active.is_none() && draw_state.active.is_none()
+}
+
+/// `brush.join` / `brush.csg_subtract` / `brush.csg_intersect` all
+/// require at least two `Brush` entities in the current selection.
+fn can_run_binary_brush_op(
     input_focus: Res<InputFocus>,
     modal: Res<crate::modal_transform::ModalTransformState>,
     draw_state: Res<DrawBrushState>,
+    selection: Res<Selection>,
+    brushes: Query<(), With<Brush>>,
+) -> bool {
+    if !env_allows_brush_op(&input_focus, &modal, &draw_state) {
+        return false;
+    }
+    selection
+        .entities
+        .iter()
+        .filter(|&&e| brushes.contains(e))
+        .count()
+        >= 2
+}
+
+/// `brush.extend_face_to_brush` needs either (a) Face edit mode with a
+/// face picked and another brush selected, or (b) Object mode with ≥ 2
+/// brushes selected and a remembered/hovered face on the primary.
+fn can_run_extend_face(
+    input_focus: Res<InputFocus>,
+    modal: Res<crate::modal_transform::ModalTransformState>,
+    draw_state: Res<DrawBrushState>,
+    selection: Res<Selection>,
+    brush_selection: Res<crate::brush::BrushSelection>,
+    edit_mode: Res<crate::brush::EditMode>,
+    brushes: Query<(), With<Brush>>,
+) -> bool {
+    if !env_allows_brush_op(&input_focus, &modal, &draw_state) {
+        return false;
+    }
+    let brush_count = selection
+        .entities
+        .iter()
+        .filter(|&&e| brushes.contains(e))
+        .count();
+    match *edit_mode {
+        crate::brush::EditMode::BrushEdit(crate::brush::BrushEditMode::Face) => {
+            brush_selection.entity.is_some()
+                && !brush_selection.faces.is_empty()
+                && brush_count >= 1
+        }
+        crate::brush::EditMode::Object => {
+            brush_count >= 2
+                && brush_selection.last_face_entity.is_some_and(|e| {
+                    brush_selection.last_face_index.is_some() && brushes.contains(e)
+                })
+        }
+        _ => false,
+    }
+}
+
+#[operator(
+    id = "brush.extend_face_to_brush",
+    label = "Extend to Brush",
+    description = "Extend a face of the primary brush to conform to the shape of \
+                   the other selected brushes. Two entry paths:\n\
+                   • `EditMode::BrushEdit(Face)` with a face selected on \
+                     `BrushSelection` and ≥ 1 other brush in `Selection::entities`.\n\
+                   • `EditMode::Object` with ≥ 2 brushes in `Selection::entities` \
+                     and a remembered face on the primary.\n\
+                   Availability (`can_run_extend_face`) is false when neither \
+                   entry path applies. The Object-mode path additionally \
+                   tries to resolve a hovered face via raycast once invoked; \
+                   if that also fails it returns `Cancelled`.",
+    is_available = can_run_extend_face,
+)]
+pub(crate) fn brush_extend_face_to_brush(
+    _: In<OperatorParameters>,
     mut edit_mode: ResMut<crate::brush::EditMode>,
     selection: Res<Selection>,
     mut brush_selection: ResMut<crate::brush::BrushSelection>,
@@ -3129,24 +3314,16 @@ fn extend_face_to_brush(
     brush_faces: Query<&BrushFaceEntity>,
     brush_query: Query<(), With<Brush>>,
     mut commands: Commands,
-) {
-    use crate::keybinds::EditorAction;
-
-    if !keybinds.just_pressed(EditorAction::ExtendFaceToBrush, &keyboard) {
-        return;
-    }
-    if input_focus.0.is_some() || modal.active.is_some() || draw_state.active.is_some() {
-        return;
-    }
+) -> OperatorResult {
     // Resolve (primary, face_index, targets) depending on edit mode
     let (primary, face_index, targets) =
         if *edit_mode == crate::brush::EditMode::BrushEdit(crate::brush::BrushEditMode::Face) {
             // Face mode path: primary is the brush being edited, face is the selected face
             let Some(primary) = brush_selection.entity.filter(|&e| brush_query.contains(e)) else {
-                return;
+                return OperatorResult::Cancelled;
             };
             let Some(&face_index) = brush_selection.faces.last() else {
-                return;
+                return OperatorResult::Cancelled;
             };
             let targets: Vec<Entity> = selection
                 .entities
@@ -3155,7 +3332,7 @@ fn extend_face_to_brush(
                 .filter(|&e| e != primary && brush_query.contains(e))
                 .collect();
             if targets.is_empty() {
-                return;
+                return OperatorResult::Cancelled;
             }
             (primary, face_index, targets)
         } else if *edit_mode == crate::brush::EditMode::Object {
@@ -3167,11 +3344,11 @@ fn extend_face_to_brush(
                 .filter(|&e| brush_query.contains(e))
                 .collect();
             if selected_brushes.len() < 2 {
-                return;
+                return OperatorResult::Cancelled;
             }
 
             let Some(primary) = selection.primary().filter(|e| brush_query.contains(*e)) else {
-                return;
+                return OperatorResult::Cancelled;
             };
             let targets: Vec<Entity> = selected_brushes
                 .into_iter()
@@ -3197,11 +3374,11 @@ fn extend_face_to_brush(
             });
 
             let Some(face_index) = face_index else {
-                return;
+                return OperatorResult::Cancelled;
             };
             (primary, face_index, targets)
         } else {
-            return;
+            return OperatorResult::Cancelled;
         };
 
     // If we were in face mode, exit it (geometry is about to change, indices become invalid)
@@ -3217,6 +3394,7 @@ fn extend_face_to_brush(
     commands.queue(move |world: &mut World| {
         extend_face_to_brush_impl(world, primary, &targets_clone, face_index);
     });
+    OperatorResult::Finished
 }
 
 /// Raycast from cursor to find a hovered `BrushFaceEntity` belonging to the given brush.

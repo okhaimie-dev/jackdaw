@@ -6,7 +6,10 @@ pub mod app_ops;
 pub mod asset_browser;
 pub mod asset_catalog;
 pub mod brush;
+pub mod brush_drag_ops;
+pub mod brush_element_ops;
 pub mod builtin_extensions;
+pub mod clip_ops;
 pub mod commands;
 pub mod custom_properties;
 pub mod default_style;
@@ -30,8 +33,8 @@ pub use inspector::{EditorMeta, ReflectEditorMeta};
 pub mod core_extension;
 pub mod ext_build;
 mod extension_lifecycle;
+pub mod extension_resolution;
 pub mod extension_watcher;
-pub mod extensions_config;
 pub mod extensions_dialog;
 pub mod hot_reload;
 pub mod layout;
@@ -41,6 +44,7 @@ pub mod measure_tool;
 pub mod modal_transform;
 pub mod navmesh;
 pub mod new_project;
+pub mod operator_tooltip;
 pub mod physics_brush_bridge;
 pub mod physics_tool;
 pub mod pie;
@@ -252,6 +256,7 @@ impl Plugin for EditorCorePlugin {
             .add_plugins(jackdaw_avian_integration::simulation::PhysicsSimulationPlugin)
             .add_plugins(physics_brush_bridge::PhysicsBrushBridgePlugin)
             .add_plugins(physics_tool::PhysicsToolPlugin)
+            .add_plugins(operator_tooltip::OperatorTooltipPlugin)
             .add_plugins(jackdaw_node_graph::NodeGraphPlugin)
             .add_plugins(jackdaw_animation::AnimationPlugin)
             .add_plugins(jackdaw_panels::DockPlugin)
@@ -313,7 +318,6 @@ impl Plugin for EditorCorePlugin {
                     register_animation_entities_in_ast,
                     follow_scene_selection_to_clip,
                     sync_selected_keyframes_from_selection,
-                    handle_keyframe_delete_intercept,
                     handle_timeline_shortcuts,
                     auto_save_layout_on_change,
                     add_entity_picker::filter_add_entity_picker,
@@ -358,18 +362,11 @@ impl ExtensionPlugin {
 
     /// Register an extension. May be called any number of times.
     pub fn with_extension<T: JackdawExtension + Default>(mut self) -> Self {
+        const {
+            assert!(size_of::<T>() == 0, "Extension must be a zero-sized type.");
+        }
         self.user_extensions
             .push(std::sync::Arc::new(|| Box::new(T::default())));
-        self
-    }
-
-    /// Like [`ExtensionPlugin::with_extension`], but takes a constructor function
-    /// instead of a type implementing [`JackdawExtension`].
-    pub fn with_extension_ctor<F>(mut self, ctor: F) -> Self
-    where
-        F: Fn() -> Box<dyn JackdawExtension> + Send + Sync + 'static,
-    {
-        self.user_extensions.push(std::sync::Arc::new(ctor));
         self
     }
 
@@ -400,7 +397,7 @@ impl Plugin for ExtensionPlugin {
 
         for ctor in &self.user_extensions {
             let ctor = std::sync::Arc::clone(ctor);
-            app.register_extension_dynamic(move || (*ctor)());
+            app.register_extension_with(move || (*ctor)());
         }
     }
 }
@@ -1064,65 +1061,71 @@ impl DespawnKeyframeCmd {
 /// remaining non-keyframe entities normally. Both halves land on
 /// the history as independent commands, which is fine: undo
 /// reverses them in push order.
-fn handle_keyframe_delete_intercept(world: &mut World) {
-    let keyboard = world.resource::<ButtonInput<KeyCode>>();
-    let keybinds = world.resource::<crate::keybinds::KeybindRegistry>();
-    if !keybinds.just_pressed(crate::keybinds::EditorAction::Delete, keyboard) {
-        return;
-    }
-
-    // Don't process delete while a text input is focused. Matches
-    // the guard in `handle_entity_keys`.
-    if world
-        .resource::<bevy::input_focus::InputFocus>()
-        .0
-        .is_some()
-    {
-        return;
-    }
-
-    let selected: Vec<Entity> = world.resource::<selection::Selection>().entities.clone();
-    if selected.is_empty() {
-        return;
-    }
-
-    // Split the selection into keyframe entities and everything else.
-    let mut kf_cmds: Vec<Box<dyn jackdaw_commands::EditorCommand>> = Vec::new();
-    let mut keyframe_ids: Vec<Entity> = Vec::new();
-    for &entity in &selected {
-        if let Some(cmd) = DespawnKeyframeCmd::try_from_entity(world, entity) {
-            keyframe_ids.push(entity);
-            kf_cmds.push(Box::new(cmd));
+/// Delete all keyframe entities currently in [`selection::Selection`]
+/// as a single undoable group. Strips them from the selection first so
+/// any non-keyframe entities still in the selection get processed by
+/// the generic [`entity_ops::EntityDeleteOp`] in the same press.
+#[operator(
+    id = "clip.delete_keyframes",
+    label = "Delete Keyframes",
+    description = "Remove the selected animation keyframes.",
+    is_available = has_selected_keyframes,
+)]
+pub(crate) fn clip_delete_keyframes(
+    _: In<OperatorParameters>,
+    mut commands: bevy::prelude::Commands,
+) -> OperatorResult {
+    commands.queue(|world: &mut World| {
+        let selected: Vec<Entity> = world.resource::<selection::Selection>().entities.clone();
+        let mut kf_cmds: Vec<Box<dyn jackdaw_commands::EditorCommand>> = Vec::new();
+        let mut keyframe_ids: Vec<Entity> = Vec::new();
+        for &entity in &selected {
+            if let Some(cmd) = DespawnKeyframeCmd::try_from_entity(world, entity) {
+                keyframe_ids.push(entity);
+                kf_cmds.push(Box::new(cmd));
+            }
         }
-    }
-
-    if kf_cmds.is_empty() {
-        return;
-    }
-
-    // Strip the keyframes out of Selection so the downstream
-    // generic delete path doesn't see them.
-    {
-        let mut selection = world.resource_mut::<selection::Selection>();
-        selection.entities.retain(|e| !keyframe_ids.contains(e));
-    }
-    for entity in &keyframe_ids {
-        if let Ok(mut ent) = world.get_entity_mut(*entity) {
-            ent.remove::<selection::Selected>();
+        if kf_cmds.is_empty() {
+            return;
         }
-    }
+        {
+            let mut selection = world.resource_mut::<selection::Selection>();
+            selection.entities.retain(|e| !keyframe_ids.contains(e));
+        }
+        for entity in &keyframe_ids {
+            if let Ok(mut ent) = world.get_entity_mut(*entity) {
+                ent.remove::<selection::Selected>();
+            }
+        }
+        for cmd in &mut kf_cmds {
+            cmd.execute(world);
+        }
+        let group = commands::CommandGroup {
+            commands: kf_cmds,
+            label: "Delete keyframes".to_string(),
+        };
+        let mut history = world.resource_mut::<jackdaw_commands::CommandHistory>();
+        history.push_executed(Box::new(group));
+    });
+    OperatorResult::Finished
+}
 
-    // Execute each keyframe despawn and wrap them in a single
-    // group so Ctrl+Z undoes the whole delete at once.
-    for cmd in &mut kf_cmds {
-        cmd.execute(world);
+fn has_selected_keyframes(
+    input_focus: Res<bevy::input_focus::InputFocus>,
+    selection: Res<selection::Selection>,
+    keyframes: Query<
+        (),
+        bevy::ecs::query::Or<(
+            With<jackdaw_animation::Vec3Keyframe>,
+            With<jackdaw_animation::QuatKeyframe>,
+            With<jackdaw_animation::F32Keyframe>,
+        )>,
+    >,
+) -> bool {
+    if input_focus.0.is_some() {
+        return false;
     }
-    let group = commands::CommandGroup {
-        commands: kf_cmds,
-        label: "Delete keyframes".to_string(),
-    };
-    let mut history = world.resource_mut::<jackdaw_commands::CommandHistory>();
-    history.push_executed(Box::new(group));
+    selection.entities.iter().any(|&e| keyframes.contains(e))
 }
 
 /// Typed, undo-aware spawn command for animation keyframes. Mirror of
@@ -1861,10 +1864,6 @@ fn populate_menu(
         "window.reset_layout".to_string(),
         "Reset Layout".to_string(),
     ));
-    let window_entries_refs: Vec<(&str, &str)> = window_entries
-        .iter()
-        .map(|(k, v)| (k.as_str(), v.as_str()))
-        .collect();
 
     // Build the Add menu from the shared helper so the toolbar and the
     // scene-tree Add Entity picker stay in lockstep. Separators are
@@ -1881,10 +1880,6 @@ fn populate_menu(
         }
         add_menu.push((item.action, item.label));
     }
-    let add_menu_refs: Vec<(&str, &str)> = add_menu
-        .iter()
-        .map(|(k, v)| (k.as_str(), v.as_str()))
-        .collect();
 
     // Current hot-reload state → reflect in the menu label.
     let hot_reload_on = world
@@ -1904,130 +1899,74 @@ fn populate_menu(
             (
                 "File",
                 vec![
-                    ("op:scene.new", "New"),
-                    ("op:scene.open", "Open"),
-                    ("---", ""),
-                    ("op:scene.save", "Save"),
-                    ("op:scene.save_as", "Save As..."),
-                    ("---", ""),
-                    (
-                        "op:scene.save_selection_as_template",
+                    op_entry::<scene_ops::SceneNewOp>("New"),
+                    op_entry::<scene_ops::SceneOpenOp>("Open"),
+                    separator(),
+                    op_entry::<scene_ops::SceneSaveOp>("Save"),
+                    op_entry::<scene_ops::SceneSaveAsOp>("Save As..."),
+                    separator(),
+                    op_entry::<scene_ops::SceneSaveSelectionAsTemplateOp>(
                         "Save Selection as Template",
                     ),
-                    ("---", ""),
-                    ("op:app.open_keybinds", "Keybinds..."),
-                    ("op:app.open_extensions", "Extensions..."),
-                    ("---", ""),
-                    ("op:app.toggle_hot_reload", hot_reload_label),
-                    ("op:scene.open_recent", "Open Recent..."),
-                    ("op:app.go_home", "Home"),
+                    separator(),
+                    op_entry::<app_ops::AppOpenKeybindsOp>("Keybinds..."),
+                    op_entry::<app_ops::AppOpenExtensionsOp>("Extensions..."),
+                    separator(),
+                    op_entry::<app_ops::AppToggleHotReloadOp>(hot_reload_label),
+                    op_entry::<scene_ops::SceneOpenRecentOp>("Open Recent..."),
+                    op_entry::<app_ops::AppGoHomeOp>("Home"),
                 ],
             ),
             (
                 "Edit",
                 vec![
-                    ("op:history.undo", "Undo"),
-                    ("op:history.redo", "Redo"),
-                    ("---", ""),
-                    ("op:entity.delete", "Delete"),
-                    ("op:entity.duplicate", "Duplicate"),
-                    ("---", ""),
-                    ("edit.join", "Join (Convex Merge)"),
-                    ("edit.csg_subtract", "CSG Subtract"),
-                    ("edit.csg_intersect", "CSG Intersect"),
-                    ("edit.extend_to_brush", "Extend to Brush"),
+                    op_entry::<history_ops::HistoryUndoOp>("Undo"),
+                    op_entry::<history_ops::HistoryRedoOp>("Redo"),
+                    separator(),
+                    op_entry::<entity_ops::EntityDeleteOp>("Delete"),
+                    op_entry::<entity_ops::EntityDuplicateOp>("Duplicate"),
+                    separator(),
+                    op_entry::<draw_brush::BrushJoinOp>("Join (Convex Merge)"),
+                    op_entry::<draw_brush::BrushCsgSubtractOp>("CSG Subtract"),
+                    op_entry::<draw_brush::BrushCsgIntersectOp>("CSG Intersect"),
+                    op_entry::<draw_brush::BrushExtendFaceToBrushOp>("Extend to Brush"),
                 ],
             ),
             (
                 "View",
                 vec![
-                    ("op:view.toggle_wireframe", "Toggle Wireframe"),
-                    ("op:view.toggle_bounding_boxes", "Toggle Bounding Boxes"),
-                    ("op:view.cycle_bounding_box_mode", "Cycle Bounding Box Mode"),
-                    ("op:view.toggle_face_grid", "Toggle Face Grid"),
-                    ("op:view.toggle_brush_wireframe", "Toggle Brush Wireframe"),
-                    ("op:view.toggle_brush_outline", "Toggle Brush Outline"),
-                    ("op:view.toggle_alignment_guides", "Toggle Alignment Guides"),
-                    ("op:view.toggle_collider_gizmos", "Toggle Collider Gizmos"),
-                    ("op:view.toggle_hierarchy_arrows", "Toggle Hierarchy Arrows"),
+                    op_entry::<view_ops::ViewToggleWireframeOp>("Toggle Wireframe"),
+                    op_entry::<view_ops::ViewToggleBoundingBoxesOp>("Toggle Bounding Boxes"),
+                    op_entry::<view_ops::ViewCycleBoundingBoxModeOp>("Cycle Bounding Box Mode"),
+                    op_entry::<view_ops::ViewToggleFaceGridOp>("Toggle Face Grid"),
+                    op_entry::<view_ops::ViewToggleBrushWireframeOp>("Toggle Brush Wireframe"),
+                    op_entry::<view_ops::ViewToggleBrushOutlineOp>("Toggle Brush Outline"),
+                    op_entry::<view_ops::ViewToggleAlignmentGuidesOp>("Toggle Alignment Guides"),
+                    op_entry::<view_ops::ViewToggleColliderGizmosOp>("Toggle Collider Gizmos"),
+                    op_entry::<view_ops::ViewToggleHierarchyArrowsOp>("Toggle Hierarchy Arrows"),
                 ],
             ),
-            ("Add", add_menu_refs),
-            ("Window", window_entries_refs),
+            ("Add", add_menu),
+            ("Window", window_entries),
         ],
     );
 }
 
+/// Build a menu-entry tuple whose action id is the given operator's
+/// `ID` wrapped in the feathers `op:` prefix. Keeps operator ids out
+/// of UI code — callers pass the `Op` type, not a hand-typed string.
+fn op_entry<O: Operator>(label: impl Into<String>) -> (String, String) {
+    (format!("op:{}", O::ID), label.into())
+}
+
+/// Menu separator row. Feathers renders any `(---, _)` entry as a
+/// horizontal divider.
+fn separator() -> (String, String) {
+    ("---".to_string(), String::new())
+}
+
 fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
     match event.action.as_str() {
-        "edit.join" => {
-            commands.queue(draw_brush::join_selected_brushes_impl);
-        }
-        "edit.csg_subtract" => {
-            commands.queue(draw_brush::csg_subtract_selected_impl);
-        }
-        "edit.csg_intersect" => {
-            commands.queue(draw_brush::csg_intersect_selected_impl);
-        }
-        "edit.extend_to_brush" => {
-            commands.queue(|world: &mut World| {
-                let edit_mode = *world.resource::<crate::brush::EditMode>();
-                let selection = world.resource::<Selection>();
-                let entities = selection.entities.clone();
-
-                let brush_selection = world.resource::<crate::brush::BrushSelection>();
-
-                // Resolve primary + face_index: prefer active face-mode selection,
-                // fall back to remembered face.
-                let (primary, face_index) = if edit_mode
-                    == crate::brush::EditMode::BrushEdit(crate::brush::BrushEditMode::Face)
-                {
-                    let primary = brush_selection.entity;
-                    let face = brush_selection.faces.last().copied();
-                    match (primary, face) {
-                        (Some(p), Some(f)) => (p, f),
-                        _ => return,
-                    }
-                } else {
-                    let Some(primary) = selection.primary() else {
-                        return;
-                    };
-                    let face_index = if brush_selection.last_face_entity == Some(primary) {
-                        brush_selection.last_face_index
-                    } else {
-                        None
-                    };
-                    match face_index {
-                        Some(f) => (primary, f),
-                        None => return,
-                    }
-                };
-
-                let mut brush_query = world.query_filtered::<Entity, With<jackdaw_jsn::Brush>>();
-                let targets: Vec<Entity> = entities
-                    .iter()
-                    .copied()
-                    .filter(|&e| e != primary && brush_query.get(world, e).is_ok())
-                    .collect();
-                if targets.is_empty() {
-                    return;
-                }
-
-                draw_brush::extend_face_to_brush_impl(world, primary, &targets, face_index);
-
-                // Exit face mode if we were in it (geometry changed, indices invalid)
-                if edit_mode == crate::brush::EditMode::BrushEdit(crate::brush::BrushEditMode::Face)
-                {
-                    *world.resource_mut::<crate::brush::EditMode>() =
-                        crate::brush::EditMode::Object;
-                    let mut bs = world.resource_mut::<crate::brush::BrushSelection>();
-                    bs.entity = None;
-                    bs.faces.clear();
-                    bs.vertices.clear();
-                    bs.edges.clear();
-                }
-            });
-        }
         action if action.starts_with(OP_PREFIX) => {
             // Extension-contributed menu entry. The action id is the
             // operator id with an "op:" prefix. Dispatching through the
