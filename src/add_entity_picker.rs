@@ -6,10 +6,13 @@
 use bevy::feathers::theme::ThemedText;
 use bevy::prelude::*;
 use bevy::ui_widgets::observe;
+use bevy_enhanced_input::prelude::{Press, *};
 use jackdaw_api::TopLevelMenu;
-use jackdaw_api::prelude::Operator;
+use jackdaw_api::prelude::*;
 use jackdaw_feathers::text_edit::{self, TextEditProps, TextEditValue};
 use jackdaw_feathers::tokens;
+
+use crate::core_extension::CoreExtensionInputContext;
 
 use std::collections::HashSet;
 
@@ -43,7 +46,7 @@ pub struct AddEntityPickerSectionHeader {
 }
 
 /// Build an `op:` action string for the given operator type. Keeps
-/// operator ids out of UI code — callers pass the `Op` type, not a
+/// operator ids out of UI code; callers pass the `Op` type, not a
 /// hand-typed string.
 fn op_action<O: Operator>() -> String {
     format!("op:{}", O::ID)
@@ -455,15 +458,35 @@ pub fn filter_add_entity_picker(
     }
 }
 
-/// Close on Escape.
-pub fn close_add_entity_picker_on_escape(
-    keys: Res<ButtonInput<KeyCode>>,
+pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
+    ctx.register_operator::<AddEntityPickerCloseOp>();
+    let ext = ctx.id();
+    ctx.spawn((
+        Action::<AddEntityPickerCloseOp>::new(),
+        ActionOf::<CoreExtensionInputContext>::new(ext),
+        bindings![(KeyCode::Escape, Press::default())],
+    ));
+}
+
+fn add_entity_picker_open(pickers: Query<(), With<AddEntityPicker>>) -> bool {
+    !pickers.is_empty()
+}
+
+/// Close the Add Entity picker. Triggered by Escape via BEI.
+#[operator(
+    id = "add_entity_picker.close",
+    label = "Close Add Entity Picker",
+    description = "Close the Add Entity picker.",
+    is_available = add_entity_picker_open,
+    allows_undo = false,
+)]
+pub(crate) fn add_entity_picker_close(
+    _: In<OperatorParameters>,
     pickers: Query<Entity, With<AddEntityPicker>>,
     mut commands: Commands,
-) {
-    if keys.just_pressed(KeyCode::Escape) && !pickers.is_empty() {
-        for picker in &pickers {
-            commands.entity(picker).despawn();
-        }
+) -> OperatorResult {
+    for entity in &pickers {
+        commands.entity(entity).despawn();
     }
+    OperatorResult::Finished
 }
