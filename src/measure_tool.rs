@@ -173,8 +173,9 @@ fn confirm_measure_distance(
         state.start_point = state.end_point;
         OperatorResult::Running
     } else {
-        // Second click: finish the current measurement and reset for the next one.
-        state.has_start = false;
+        // Subsequent click: finish the current measurement and immediately
+        // start a new one from the current cursor position.
+        state.start_point = state.end_point;
         OperatorResult::Running
     }
 }
