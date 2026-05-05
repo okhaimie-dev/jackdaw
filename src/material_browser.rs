@@ -803,8 +803,8 @@ fn update_preview_area(
             PreviewAreaImage,
             ImageNode::new(preview_img),
             Node {
-                width: Val::Px(128.0),
-                height: Val::Px(128.0),
+                width: Val::Px(tokens::PREVIEW_IMAGE_SIZE),
+                height: Val::Px(tokens::PREVIEW_IMAGE_SIZE),
                 align_self: AlignSelf::Center,
                 ..Default::default()
             },
@@ -1377,8 +1377,8 @@ fn update_material_browser_ui(
         let thumb_entity = commands
             .spawn((
                 Node {
-                    width: Val::Px(64.0),
-                    height: Val::Px(80.0),
+                    width: Val::Px(tokens::THUMB_CELL_WIDTH),
+                    height: Val::Px(tokens::THUMB_CELL_HEIGHT),
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
                     padding: UiRect::all(Val::Px(2.0)),
@@ -1401,8 +1401,8 @@ fn update_material_browser_ui(
             commands.spawn((
                 ImageNode::new(img),
                 Node {
-                    width: Val::Px(56.0),
-                    height: Val::Px(56.0),
+                    width: Val::Px(tokens::THUMB_IMAGE_SIZE),
+                    height: Val::Px(tokens::THUMB_IMAGE_SIZE),
                     ..Default::default()
                 },
                 ChildOf(thumb_entity),
@@ -1410,8 +1410,8 @@ fn update_material_browser_ui(
         } else {
             commands.spawn((
                 Node {
-                    width: Val::Px(56.0),
-                    height: Val::Px(56.0),
+                    width: Val::Px(tokens::THUMB_IMAGE_SIZE),
+                    height: Val::Px(tokens::THUMB_IMAGE_SIZE),
                     ..Default::default()
                 },
                 BackgroundColor(Color::srgb(0.3, 0.3, 0.3)),
